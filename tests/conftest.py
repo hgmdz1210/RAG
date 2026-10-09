@@ -14,10 +14,13 @@ from collections.abc import Sequence
 import pytest
 from qdrant_client import QdrantClient
 
+from rag.auth import User
 from rag.config import Settings
+from rag.db import create_tables, make_engine
 from rag.documents import Document, Hit
 from rag.embeddings import SparseVector
 from rag.generate import Answer
+from rag.library import Library
 from rag.pipeline import Indexer, Retriever
 from rag.services import Services
 from rag.store import QdrantStore
@@ -122,6 +125,34 @@ class FakeGenerator:
         return Answer(text="Based on the first passage [1].", cited=[1], model="fake-model")
 
 
+class MemoryStorage:
+    """File storage kept in a dict; set ``fail`` to make writes raise."""
+
+    def __init__(self) -> None:
+        self.files: dict[str, bytes] = {}
+        self.fail: Exception | None = None
+
+    def put(self, key: str, data: bytes, content_type: str) -> None:
+        if self.fail is not None:
+            raise self.fail
+        self.files[key] = data
+
+    def delete(self, key: str) -> None:
+        self.files.pop(key, None)
+
+
+class FakeAuth:
+    """Accepts the tokens ``alice-token`` and ``bob-token``."""
+
+    users = {
+        "alice-token": User(id="alice", email="alice@example.com"),
+        "bob-token": User(id="bob", email="bob@example.com"),
+    }
+
+    def verify(self, token: str) -> User | None:
+        return self.users.get(token)
+
+
 @pytest.fixture
 def store() -> QdrantStore:
     return QdrantStore(QdrantClient(":memory:"), "test")
@@ -145,13 +176,17 @@ def retriever(store: QdrantStore, indexer: Indexer, reranker: FakeReranker) -> R
 
 @pytest.fixture
 def services(store: QdrantStore, indexer: Indexer, reranker: FakeReranker) -> Services:
-    """Fully wired services over an empty collection."""
+    """Fully wired services over an empty collection and an empty database."""
+    engine = make_engine("sqlite://")
+    create_tables(engine)
+    library = Library(engine, MemoryStorage(), indexer, store, max_upload_bytes=1_000_000)
     return Services(
         settings=Settings(_env_file=None),
         store=store,
         indexer=indexer,
         retriever=Retriever(store, FakeDense(), FakeSparse(), reranker),
         generator=FakeGenerator(),
+        library=library,
     )
 
 

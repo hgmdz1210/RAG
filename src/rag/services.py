@@ -1,12 +1,17 @@
 """Build the concrete pipeline objects from settings."""
 
 from dataclasses import dataclass
+from pathlib import Path
 
+from rag.auth import Authenticator, SupabaseAuthenticator
 from rag.config import Settings
+from rag.db import create_tables, make_engine
 from rag.embeddings import FastEmbedDense, FastEmbedSparse
 from rag.generate import GeminiGenerator, Generator
+from rag.library import Library
 from rag.pipeline import Indexer, Retriever
 from rag.rerank import FastEmbedReranker
+from rag.storage import FileStorage, LocalStorage, SupabaseStorage
 from rag.store import QdrantStore, make_client
 
 
@@ -17,6 +22,9 @@ class Services:
     indexer: Indexer
     retriever: Retriever
     generator: Generator
+    library: Library
+    # None means sign-in is not configured and there is a single local user.
+    auth: Authenticator | None = None
 
 
 def build_services(settings: Settings, *, collection: str | None = None) -> Services:
@@ -31,17 +39,35 @@ def build_services(settings: Settings, *, collection: str | None = None) -> Serv
     client = make_client(settings.qdrant_url, settings.qdrant_path)
     store = QdrantStore(client, collection or settings.collection)
 
+    indexer = Indexer(
+        store,
+        dense,
+        sparse,
+        chunk_size=settings.chunk_size,
+        chunk_overlap=settings.chunk_overlap,
+    )
+
+    engine = make_engine(settings.database_url)
+    if engine.dialect.name == "sqlite":
+        # A local SQLite file needs no migration step; PostgreSQL is migrated
+        # explicitly with `rag migrate`.
+        if engine.url.database and engine.url.database != ":memory:":
+            Path(engine.url.database).parent.mkdir(parents=True, exist_ok=True)
+        create_tables(engine)
+
     api_key = settings.gemini_api_key
     return Services(
         settings=settings,
         store=store,
-        indexer=Indexer(
+        indexer=indexer,
+        library=Library(
+            engine,
+            _make_storage(settings),
+            indexer,
             store,
-            dense,
-            sparse,
-            chunk_size=settings.chunk_size,
-            chunk_overlap=settings.chunk_overlap,
+            max_upload_bytes=settings.max_upload_mb * 1_000_000,
         ),
+        auth=_make_auth(settings),
         retriever=Retriever(store, dense, sparse, reranker, rrf_k=settings.rrf_k),
         generator=GeminiGenerator(
             model=settings.llm_model,
@@ -49,3 +75,21 @@ def build_services(settings: Settings, *, collection: str | None = None) -> Serv
             api_key=api_key.get_secret_value() if api_key else None,
         ),
     )
+
+
+def _make_auth(settings: Settings) -> Authenticator | None:
+    if settings.supabase_url and settings.supabase_anon_key:
+        return SupabaseAuthenticator(
+            settings.supabase_url, settings.supabase_anon_key.get_secret_value()
+        )
+    return None
+
+
+def _make_storage(settings: Settings) -> FileStorage:
+    if settings.supabase_url and settings.supabase_service_role_key:
+        return SupabaseStorage(
+            settings.supabase_url,
+            settings.supabase_service_role_key.get_secret_value(),
+            settings.storage_bucket,
+        )
+    return LocalStorage(settings.upload_dir)

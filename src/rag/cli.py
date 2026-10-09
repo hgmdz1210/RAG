@@ -56,6 +56,11 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--port", type=int, default=8000)
     serve.set_defaults(handler=_serve)
 
+    migrate = commands.add_parser(
+        "migrate", help="create or update the tables in the configured database"
+    )
+    migrate.set_defaults(handler=_migrate)
+
     evaluate = commands.add_parser(
         "eval", help="benchmark retrieval configurations on a BEIR dataset"
     )
@@ -143,6 +148,15 @@ def _serve(args: argparse.Namespace) -> int:
     from rag.api import create_app
 
     uvicorn.run(create_app(), host=args.host, port=args.port)
+    return 0
+
+
+def _migrate(args: argparse.Namespace) -> int:
+    from rag import db
+
+    engine = db.make_engine(get_settings().database_url)
+    db.migrate(engine)
+    print(f"Database schema is up to date ({engine.dialect.name}, host {engine.url.host}).")
     return 0
 
 

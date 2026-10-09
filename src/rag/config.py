@@ -49,10 +49,35 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("GEMINI_API_KEY", "GOOGLE_API_KEY", "RAG_GEMINI_API_KEY"),
     )
 
+    # Relational database for the document registry and the question history.
+    # SQLite by default; a postgresql:// URL (for example Supabase) for real use.
+    database_url: str = "sqlite:///data/app.db"
+
+    # Supabase project. With the URL and the anon key set, the API requires a
+    # signed-in user and keeps each user's documents apart. With the service key
+    # as well, uploaded files are kept in Supabase Storage instead of on disk.
+    supabase_url: str | None = Field(default=None, validation_alias="SUPABASE_URL")
+    supabase_anon_key: SecretStr | None = Field(default=None, validation_alias="SUPABASE_ANON_KEY")
+    supabase_service_role_key: SecretStr | None = Field(
+        default=None, validation_alias="SUPABASE_SERVICE_ROLE_KEY"
+    )
+    storage_bucket: str = "documents"
+    upload_dir: str = "data/uploads"
+    max_upload_mb: int = Field(default=20, gt=0, le=200)
+
     # When set, every API route except /health requires this value in X-API-Key.
+    # Ignored when Supabase sign-in is configured.
     api_key: SecretStr | None = None
 
-    @field_validator("qdrant_url", "gemini_api_key", "api_key", mode="before")
+    @field_validator(
+        "qdrant_url",
+        "gemini_api_key",
+        "api_key",
+        "supabase_url",
+        "supabase_anon_key",
+        "supabase_service_role_key",
+        mode="before",
+    )
     @classmethod
     def _blank_means_unset(cls, value: object) -> object:
         # `KEY=` in a .env file arrives as an empty string, not as a missing value.
