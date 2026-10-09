@@ -92,6 +92,7 @@ def test_ask_returns_the_answer_and_marks_cited_sources(client):
     assert body["answer"] == "Based on the first passage [1]."
     assert body["model"] == "fake-model"
     assert body["refused"] is False
+    assert body["answerable"] is True
     assert [source["cited"] for source in body["sources"]][:2] == [True, False]
     assert body["sources"][0]["doc_id"] == "rerank.md"
 

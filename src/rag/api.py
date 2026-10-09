@@ -61,6 +61,7 @@ class AskResponse(BaseModel):
     answer: str
     model: str
     refused: bool
+    answerable: bool
     sources: list[HitOut]
 
 
@@ -163,6 +164,7 @@ def create_app(services: Services | None = None) -> FastAPI:
             answer=answer.text,
             model=answer.model,
             refused=answer.refused,
+            answerable=answer.answerable,
             sources=_hits_out(hits, cited=answer.cited),
         )
 

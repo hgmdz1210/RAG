@@ -1,3 +1,4 @@
+import json
 from types import SimpleNamespace
 
 import httpx
@@ -50,7 +51,15 @@ class FakeClient:
         return self.outcome
 
 
-def _response(text: str | None, finish_reason=types.FinishReason.STOP, candidates: int = 1):
+def _response(
+    text: str | None,
+    finish_reason=types.FinishReason.STOP,
+    candidates: int = 1,
+    answerable: bool = True,
+    raw: bool = False,
+):
+    if text is not None and not raw:
+        text = json.dumps({"answerable": answerable, "answer": text})
     return SimpleNamespace(
         text=text,
         candidates=[SimpleNamespace(finish_reason=finish_reason)] * candidates,
@@ -115,11 +124,34 @@ def test_answer_returns_text_citations_and_model():
     assert answer.cited == [1]
     assert answer.model == "gemini-3.8-flash"
     assert not answer.refused
+    assert answer.answerable
     (call,) = client.calls
+    assert call["config"].response_mime_type == "application/json"
     assert call["model"] == "gemini-3.8-flash"
     assert call["config"].system_instruction == SYSTEM_PROMPT
     assert call["config"].max_output_tokens == 1000
     assert "What does BM25 reward?" in call["contents"]
+
+
+def test_an_unanswerable_reply_cites_nothing_even_if_it_mentions_source_numbers():
+    text = "The sources do not say. They cover BM25 [1] and fusion [3]."
+    generator, _ = _generator(_response(text, answerable=False))
+
+    answer = generator.answer("What is the capital of Australia?", HITS)
+
+    assert answer.text == text
+    assert answer.answerable is False
+    assert answer.cited == []
+
+
+def test_a_reply_that_is_not_valid_json_is_passed_through_as_text():
+    cut_off = '{"answerable": true, "answer": "Cut off [2'
+    generator, _ = _generator(_response(cut_off, raw=True))
+
+    answer = generator.answer("q", HITS)
+
+    assert answer.text == cut_off
+    assert answer.answerable
 
 
 def test_no_hits_skips_the_model_call():
@@ -129,6 +161,7 @@ def test_no_hits_skips_the_model_call():
 
     assert answer.text == NO_SOURCES_ANSWER
     assert answer.cited == []
+    assert answer.answerable is False
     assert client.calls == []
 
 

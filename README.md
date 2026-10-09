@@ -169,7 +169,7 @@ Searching and benchmarking need no API key. `ask` needs a Gemini API key in
 | Route | Purpose |
 |---|---|
 | `POST /search` | Retrieve passages. Body: `query`, optional `mode` (`dense`, `sparse`, `hybrid`), `top_k`, `rerank`. |
-| `POST /ask` | Retrieve, then answer with citations. Body: `question`, same options. Each returned source carries a `cited` flag. |
+| `POST /ask` | Retrieve, then answer with citations. Body: `question`, same options. Each returned source carries a `cited` flag, and `answerable` is false when the sources did not contain the answer. |
 | `GET /health` | Liveness and the number of indexed chunks. |
 | `GET /` | Demo page. Interactive API docs are at `/docs`. |
 

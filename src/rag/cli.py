@@ -131,7 +131,8 @@ def _ask(args: argparse.Namespace) -> int:
         return 1
     print(answer.text)
     if hits:
-        print("\nSources (* = cited):")
+        label = "Sources (* = cited):" if answer.answerable else "Retrieved, but not used:"
+        print(f"\n{label}")
         _print_hits(hits, cited=answer.cited)
     return 0
 
