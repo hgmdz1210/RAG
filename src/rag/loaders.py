@@ -1,5 +1,6 @@
 """Read ``.txt``, ``.md`` and ``.pdf`` files from disk into documents."""
 
+import io
 import logging
 from collections.abc import Iterator
 from pathlib import Path
@@ -41,23 +42,34 @@ def load_path(path: Path) -> Iterator[Document]:
 
 def load_file(path: Path, root: Path) -> Document | None:
     """Load one file, or return ``None`` when it contains no text."""
-    suffix = path.suffix.lower()
-    if suffix == ".pdf":
-        text, title = _read_pdf(path)
-    else:
-        text = path.read_text(encoding="utf-8", errors="replace")
-        title = _markdown_title(text) if suffix == ".md" else ""
-    text = text.strip()
+    text, title = parse_document(path.name, path.read_bytes())
     if not text:
         return None
     relative = path.relative_to(root).as_posix()
     return Document(doc_id=relative, text=text, title=title, source=relative)
 
 
-def _read_pdf(path: Path) -> tuple[str, str]:
+def parse_document(filename: str, data: bytes) -> tuple[str, str]:
+    """Extract ``(text, title)`` from a file's bytes; the type comes from the name.
+
+    Working on bytes lets uploaded files be parsed without ever being written
+    to a path chosen by the uploader.
+    """
+    suffix = Path(filename).suffix.lower()
+    if suffix not in SUPPORTED_SUFFIXES:
+        raise ValueError(f"unsupported file type: {suffix or filename!r}")
+    if suffix == ".pdf":
+        text, title = _read_pdf(data)
+    else:
+        text = data.decode("utf-8", errors="replace")
+        title = _markdown_title(text) if suffix == ".md" else ""
+    return text.strip(), title
+
+
+def _read_pdf(data: bytes) -> tuple[str, str]:
     from pypdf import PdfReader
 
-    reader = PdfReader(path)
+    reader = PdfReader(io.BytesIO(data))
     text = "\n\n".join(page.extract_text() or "" for page in reader.pages)
     title = (reader.metadata.title or "") if reader.metadata else ""
     return text, title.strip()

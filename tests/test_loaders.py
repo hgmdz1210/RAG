@@ -76,3 +76,19 @@ def test_skips_empty_and_corrupt_files(tmp_path):
 def test_missing_path_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         list(load_path(tmp_path / "does-not-exist"))
+
+
+def test_parse_document_reads_bytes_by_file_type():
+    from rag.loaders import parse_document
+
+    assert parse_document("notes.txt", b"  Plain notes.  ") == ("Plain notes.", "")
+    assert parse_document("guide.MD", b"# Guide\n\nBody.") == ("# Guide\n\nBody.", "Guide")
+    text, _ = parse_document("paper.pdf", _minimal_pdf("Bytes are enough"))
+    assert "Bytes are enough" in text
+
+
+def test_parse_document_rejects_unsupported_types():
+    from rag.loaders import parse_document
+
+    with pytest.raises(ValueError, match="unsupported"):
+        parse_document("malware.exe", b"MZ")
