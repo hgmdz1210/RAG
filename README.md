@@ -76,6 +76,41 @@ What the numbers support:
 The full report is in [`results/scifact.md`](results/scifact.md), with per-query scores
 in [`results/scifact.json`](results/scifact.json).
 
+### A second dataset: NFCorpus
+
+The same command was then run, with no setting changed, on
+[NFCorpus](https://www.cl.uni-heidelberg.de/statnlpgroup/nfcorpus/) from BEIR: 3,633
+medical documents and 323 test queries. Queries here are short consumer health topics
+with many relevant documents each, so Recall@10 is low for every configuration.
+
+| Configuration | nDCG@10 | Recall@10 | MRR@10 | Hit@1 | p50 | p95 |
+|---|---|---|---|---|---|---|
+| Dense | 0.348 (0.314–0.384) | 0.165 (0.141–0.192) | 0.536 (0.491–0.585) | 0.446 (0.393–0.501) | 13 ms | 33 ms |
+| BM25 | 0.323 (0.291–0.359) | 0.155 (0.129–0.183) | 0.530 (0.484–0.581) | 0.455 (0.406–0.511) | 4 ms | 27 ms |
+| Hybrid | **0.365** (0.333–0.402) | **0.178** (0.151–0.207) | 0.573 (0.528–0.621) | 0.486 (0.433–0.542) | 14 ms | 19 ms |
+| Hybrid + rerank | 0.364 (0.330–0.400) | 0.172 (0.147–0.200) | **0.590** (0.544–0.638) | **0.514** (0.461–0.567) | 2,141 ms | 2,591 ms |
+
+| Comparison | Δ nDCG@10 | 95% CI |
+|---|---|---|
+| BM25 vs dense | −0.026 | −0.046 to −0.005 |
+| Hybrid vs dense | +0.017 | +0.006 to +0.029 |
+| Hybrid + rerank vs dense | +0.015 | −0.001 to +0.031 |
+| Hybrid + rerank vs hybrid | −0.001 | −0.014 to +0.010 |
+
+The two datasets agree on the main points:
+
+- **Hybrid gains about 0.02 nDCG@10 over dense on both.** On NFCorpus the paired
+  interval excludes zero, which the SciFact interval narrowly failed to do. The fusion
+  constant was tuned on SciFact only, so this is the cleaner test of it.
+- **Reranking does not improve nDCG@10 on either.** On NFCorpus it leaves nDCG@10
+  unchanged while the first result is right more often (Hit@1 0.514 against 0.486, a
+  difference that was not tested for significance), at about 150 times the latency.
+- **Dense beats BM25 on both.**
+
+This report was produced by a native run on Windows with Python 3.14, the SciFact one
+in a Linux container, so compare latencies within a table, not across the two. Full
+report: [`results/nfcorpus.md`](results/nfcorpus.md).
+
 ### Choosing the fusion constant
 
 Reciprocal rank fusion has one parameter, k. It was chosen on SciFact's train split (809
@@ -121,7 +156,7 @@ A rerun reproduces the quality metrics exactly; latency depends on the hardware.
 committed report came from Python 3.12 in a Linux container, and a run on Windows with
 Python 3.14 against the same index matched it on every query for the three
 configurations without reranking. Other BEIR datasets use the same command, for example
-`--dataset nfcorpus`, but only SciFact has been run so far.
+`--dataset nfcorpus`.
 
 ## Quickstart
 
@@ -225,8 +260,9 @@ The full list, including the embedding and reranking models, is in
 - **Only retrieval is measured.** Whether the generated answers are faithful to their
   sources, and whether the citations are right, is not evaluated. The Gemini call is
   covered by unit tests against a stubbed client, not by a live test.
-- **One dataset, one domain.** SciFact documents are short abstracts that mostly fit in
-  one or two chunks, so the benchmark says little about chunking long documents.
+- **Two small datasets, both of short documents.** SciFact and NFCorpus documents are
+  abstracts that mostly fit in one or two chunks, so the benchmark says little about
+  chunking long documents, and both corpora are scientific or medical English.
 - **English by default.** The embedding model, the BM25 stemmer and stop words, and the
   reranker are all English models. Other languages need other models.
 - **Single turn.** There is no conversation memory and no query rewriting.
