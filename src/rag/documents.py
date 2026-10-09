@@ -9,6 +9,8 @@ class Document:
     text: str
     title: str = ""
     source: str = ""
+    # Id of the user the document belongs to; empty for a shared corpus.
+    owner: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,6 +21,7 @@ class Chunk:
     text: str
     title: str = ""
     source: str = ""
+    owner: str = ""
 
     @property
     def embedding_text(self) -> str:

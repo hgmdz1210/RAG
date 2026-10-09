@@ -49,6 +49,7 @@ def chunk_document(document: Document, chunk_size: int, overlap: int = 0) -> lis
             text=text,
             title=document.title,
             source=document.source,
+            owner=document.owner,
         )
         for index, text in enumerate(split_text(document.text, chunk_size, overlap))
     ]

@@ -103,3 +103,28 @@ def test_hybrid_returns_the_same_order_on_repeated_calls(store, indexer):
 
     for _ in range(5):
         assert [hit.chunk.chunk_id for hit in _search(store, "hybrid", query, limit=5)] == first
+
+
+def test_owner_filter_isolates_users_in_every_mode(store):
+    indexer = Indexer(store, FakeDense(), FakeSparse(), chunk_size=400, chunk_overlap=0)
+    text = "Quarterly revenue grew because subscriptions renewed."
+    indexer.index(
+        [
+            Document(doc_id="alice-report", text=text, owner="alice"),
+            Document(doc_id="bob-report", text=text, owner="bob"),
+            Document(doc_id="shared-notes", text=text),
+        ]
+    )
+
+    for mode in ("dense", "sparse", "hybrid"):
+        mine = _search(store, mode, "quarterly revenue subscriptions", limit=10, owner="alice")
+        assert [hit.chunk.doc_id for hit in mine] == ["alice-report"], mode
+        assert mine[0].chunk.owner == "alice"
+        everyone = _search(store, mode, "quarterly revenue subscriptions", limit=10)
+        assert len(everyone) == 3, mode
+
+
+def test_owner_with_no_documents_gets_nothing(store, indexer):
+    indexer.index(CORPUS)
+
+    assert _search(store, "hybrid", "vectors payload", limit=5, owner="nobody") == []

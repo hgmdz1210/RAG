@@ -106,11 +106,13 @@ class Retriever:
         top_k: int = 5,
         candidate_k: int = 30,
         rerank: bool = False,
+        owner: str | None = None,
     ) -> list[Hit]:
         """Return the ``top_k`` chunks for ``query``.
 
         With ``rerank`` the store returns ``candidate_k`` chunks, the cross-encoder
-        rescores them against the query, and the best ``top_k`` are kept.
+        rescores them against the query, and the best ``top_k`` are kept. With
+        ``owner`` the search is restricted to that user's documents.
         """
         query = query.strip()
         if not query:
@@ -129,6 +131,7 @@ class Retriever:
             limit=limit,
             candidate_k=candidate_k,
             rrf_k=self.rrf_k,
+            owner=owner,
         )
 
         if rerank and hits:

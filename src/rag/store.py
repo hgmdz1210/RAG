@@ -62,6 +62,11 @@ class QdrantStore:
                 field_name="doc_id",
                 field_schema=models.PayloadSchemaType.KEYWORD,
             )
+            self.client.create_payload_index(
+                collection_name=self.collection,
+                field_name="owner",
+                field_schema=models.PayloadSchemaType.KEYWORD,
+            )
 
     def drop(self) -> None:
         self.client.delete_collection(self.collection)
@@ -110,6 +115,7 @@ class QdrantStore:
                     "text": chunk.text,
                     "title": chunk.title,
                     "source": chunk.source,
+                    "owner": chunk.owner,
                 },
             )
             for chunk, dense_vector, sparse_vector in zip(chunks, dense, sparse, strict=True)
@@ -126,6 +132,7 @@ class QdrantStore:
         limit: int = 10,
         candidate_k: int = 30,
         rrf_k: int = RRF_K,
+        owner: str | None = None,
     ) -> list[Hit]:
         """Return the top ``limit`` chunks.
 
@@ -133,13 +140,21 @@ class QdrantStore:
         its top ``candidate_k`` chunks, and the two rankings are merged here with
         reciprocal rank fusion. Fusing on this side keeps the order of tied chunks
         fixed; see :func:`rag.fusion.reciprocal_rank_fusion`.
+
+        With ``owner`` only that user's chunks are searched. The filter is applied
+        inside Qdrant, so another user's text never leaves the store.
         """
+        only_owner = _owner_filter(owner)
         has_sparse = sparse is not None and bool(sparse.indices)
         if mode == "dense":
             if dense is None:
                 raise ValueError("dense search needs a dense query vector")
             response = self.client.query_points(
-                self.collection, query=list(dense), using=DENSE_VECTOR, limit=limit
+                self.collection,
+                query=list(dense),
+                using=DENSE_VECTOR,
+                limit=limit,
+                query_filter=only_owner,
             )
         elif mode == "sparse":
             if sparse is None:
@@ -148,7 +163,11 @@ class QdrantStore:
                 # The query had no indexable terms (for example only stop words).
                 return []
             response = self.client.query_points(
-                self.collection, query=_to_qdrant(sparse), using=SPARSE_VECTOR, limit=limit
+                self.collection,
+                query=_to_qdrant(sparse),
+                using=SPARSE_VECTOR,
+                limit=limit,
+                query_filter=only_owner,
             )
         elif mode == "hybrid":
             if dense is None or sparse is None:
@@ -156,7 +175,11 @@ class QdrantStore:
             depth = max(limit, candidate_k)
             requests = [
                 models.QueryRequest(
-                    query=list(dense), using=DENSE_VECTOR, limit=depth, with_payload=True
+                    query=list(dense),
+                    using=DENSE_VECTOR,
+                    limit=depth,
+                    with_payload=True,
+                    filter=only_owner,
                 )
             ]
             if has_sparse:
@@ -166,6 +189,7 @@ class QdrantStore:
                         using=SPARSE_VECTOR,
                         limit=depth,
                         with_payload=True,
+                        filter=only_owner,
                     )
                 )
             responses = self.client.query_batch_points(self.collection, requests=requests)
@@ -175,6 +199,14 @@ class QdrantStore:
         else:
             raise ValueError(f"unknown search mode: {mode!r}")
         return [_to_hit(point) for point in response.points]
+
+
+def _owner_filter(owner: str | None) -> models.Filter | None:
+    if owner is None:
+        return None
+    return models.Filter(
+        must=[models.FieldCondition(key="owner", match=models.MatchValue(value=owner))]
+    )
 
 
 def _to_qdrant(vector: SparseVector) -> models.SparseVector:
@@ -190,5 +222,6 @@ def _to_hit(point: models.ScoredPoint) -> Hit:
         text=payload["text"],
         title=payload.get("title", ""),
         source=payload.get("source", ""),
+        owner=payload.get("owner", ""),
     )
     return Hit(chunk=chunk, score=float(point.score))
