@@ -32,6 +32,16 @@ USER app
 CMD ["pytest"]
 
 
+# Streamlit front end. It only talks to the API over HTTP.
+FROM base AS ui
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --group ui --no-install-project
+COPY ui ./ui
+USER app
+EXPOSE 8501
+CMD ["streamlit", "run", "ui/app.py", "--server.address", "0.0.0.0", "--server.headless", "true"]
+
+
 # Runtime image: the API server.
 FROM base AS runtime
 COPY README.md ./

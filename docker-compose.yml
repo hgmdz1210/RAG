@@ -30,5 +30,20 @@ services:
       qdrant:
         condition: service_healthy
 
+  ui:
+    build:
+      context: .
+      target: ui
+    environment:
+      RAG_API_URL: http://api:8000
+      # Only the public values are passed on; the service key stays with the api.
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+    ports:
+      - "127.0.0.1:8501:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   qdrant_data:

@@ -32,6 +32,9 @@ flowchart LR
   answer only from them. The response says which sources were cited.
 - **No PyTorch.** All three models run on ONNX Runtime through
   [fastembed](https://github.com/qdrant/fastembed), on CPU.
+- **Your own documents.** A Streamlit app lets users sign in, upload PDF, text or
+  Markdown files and ask questions about them. Each user's documents, searches and
+  history are kept apart.
 - **Tested without infrastructure.** The test suite uses embedded Qdrant and fake
   embedders, so it needs no server, no network and no model downloads.
 
@@ -183,6 +186,30 @@ curl -s localhost:8000/ask -H 'Content-Type: application/json' \
 
 The first ingest downloads the models, about 150 MB, into `./data/models`.
 
+### Web app with uploads and sign-in
+
+The compose stack also starts a Streamlit app on <http://localhost:8501>. Out of the
+box there is a single local user and nothing else to set up: upload files in the
+sidebar and ask questions.
+
+For several users with their own documents, connect a
+[Supabase](https://supabase.com) project. It provides sign-in, the PostgreSQL
+database for the document list and question history, and private storage for the
+uploaded files, while the vectors stay in Qdrant.
+
+1. Put the project's values in `.env`, as described in `.env.example`:
+   `RAG_DATABASE_URL` (the *Session pooler* connection string), `SUPABASE_URL`,
+   `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`.
+2. Create the tables once: `docker compose run --rm api rag migrate`.
+3. Start the stack: `docker compose up --build -d`.
+
+New accounts are created from the app's sign-in page. Supabase asks new users to
+confirm their email address unless that is turned off in the project's
+authentication settings.
+
+The service key bypasses every access rule, so it is given to the API container
+only. The Streamlit container receives just the public URL and anon key.
+
 ### Local, with uv
 
 Without `RAG_QDRANT_URL`, Qdrant runs embedded in the process and stores its data in
@@ -205,11 +232,17 @@ Searching and benchmarking need no API key. `ask` needs a Gemini API key in
 |---|---|
 | `POST /search` | Retrieve passages. Body: `query`, optional `mode` (`dense`, `sparse`, `hybrid`), `top_k`, `rerank`. |
 | `POST /ask` | Retrieve, then answer with citations. Body: `question`, same options. Each returned source carries a `cited` flag, and `answerable` is false when the sources did not contain the answer. |
+| `POST /documents` | Upload a file (`multipart/form-data`, field `file`). It is stored, parsed and indexed for the caller. |
+| `GET /documents` | The caller's documents with their status and chunk count. |
+| `DELETE /documents/{id}` | Remove a document: its chunks, its stored file and its record. |
+| `GET /messages` | The caller's past questions and answers, newest first. |
 | `GET /health` | Liveness and the number of indexed chunks. |
-| `GET /` | Demo page. Interactive API docs are at `/docs`. |
+| `GET /` | Minimal demo page for the single-user setup. Interactive API docs are at `/docs`. |
 
-Documents are indexed from the command line only. The API never reads a file path sent by
-a client.
+With Supabase configured, every route except `/health` and `/` needs
+`Authorization: Bearer <access token>` from Supabase Auth, and works only on the
+caller's own documents. Uploads arrive as bytes: no route accepts a file path, so the
+service never reads a location chosen by a client.
 
 ## Configuration
 
@@ -225,7 +258,11 @@ Settings are read from environment variables or `.env`. The main ones:
 | `RAG_RERANK` | `false` | Rerank by default. A request can still ask for it. |
 | `RAG_CHUNK_SIZE` / `RAG_CHUNK_OVERLAP` | `1200` / `150` | Chunking, in characters. |
 | `RAG_LLM_MODEL` | `gemini-3.8-flash` | Model that writes the answer. |
-| `RAG_API_KEY` | unset | When set, `/search` and `/ask` require it in `X-API-Key`. |
+| `RAG_DATABASE_URL` | `sqlite:///data/app.db` | Database for the document list and question history. |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | unset | Turn on sign-in and per-user data. |
+| `SUPABASE_SERVICE_ROLE_KEY` | unset | Keep uploaded files in Supabase Storage instead of `data/uploads`. |
+| `RAG_MAX_UPLOAD_MB` | `20` | Largest accepted upload. |
+| `RAG_API_KEY` | unset | Single-user setup only: require this value in `X-API-Key`. |
 
 The full list, including the embedding and reranking models, is in
 [`src/rag/config.py`](src/rag/config.py).
@@ -255,6 +292,15 @@ The full list, including the embedding and reranking models, is in
   to reuse its wording, which flatters lexical matching. The benchmark uses BEIR
   datasets, where people wrote the queries and judged the documents.
 
+- **Three stores, one source of truth for state.** An uploaded document is a database
+  row, a stored file and chunks in Qdrant, with no transaction across them. The row is
+  written first as `processing` and becomes `ready` only when the chunks are
+  searchable; deletion removes chunks and file before the row. A step that fails
+  leaves a row that says so, never chunks that nobody can list or delete.
+- **Isolation is enforced where the data is.** The owner filter is applied inside
+  Qdrant, and row level security keeps the tables out of Supabase's public REST API,
+  so a missing check in a route cannot leak another user's text.
+
 ## Limitations
 
 - **Only retrieval is measured.** Whether the generated answers are faithful to their
@@ -271,7 +317,11 @@ The full list, including the embedding and reranking models, is in
   file, when the API and the command line need the index at the same time.
 - **Latency comes from one laptop.** Treat it as a ratio between configurations, not as
   a capacity figure.
-- **Access control is a single shared API key.** There are no users and no rate limits.
+- **Uploads are indexed while the request waits.** That is fine for documents of a few
+  dozen pages on a CPU; large files would need a background job and a progress view.
+- **No rate limits or quotas.** Any signed-in user can upload and ask without limit.
+- **The upload path through the Streamlit widget is tested by hand.** The API behind
+  it is covered by automated tests.
 
 ## Development
 
@@ -292,10 +342,16 @@ src/rag/
   fusion.py        reciprocal rank fusion with a fixed tie-break
   pipeline.py      Indexer and Retriever
   generate.py      prompt, Gemini call, citation extraction
+  db.py            documents and messages tables, migrations entry point
+  auth.py          who is calling, verified against Supabase Auth
+  storage.py       original files: Supabase Storage or a local directory
+  library.py       add, list and delete a user's documents across the three stores
+  migrations/      Alembic migrations, run by `rag migrate`
   services.py      builds the pipeline from settings
   api.py           FastAPI app
-  cli.py           ingest / search / ask / serve / eval
+  cli.py           ingest / search / ask / serve / migrate / eval
   eval/            BEIR loader, metrics, benchmark runner
+ui/app.py          Streamlit app: sign in, upload, ask
 tests/             fakes in conftest.py, one test module per source module
 results/           benchmark output committed with the code that produced it
 ```
