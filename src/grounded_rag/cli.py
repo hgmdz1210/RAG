@@ -1,6 +1,7 @@
-"""Command line interface: ingest documents, query them, and run the API server."""
+"""Command line interface: ingest documents, query them, serve the API, run the benchmark."""
 
 import argparse
+import json
 import logging
 import sys
 from collections.abc import Sequence
@@ -8,6 +9,7 @@ from pathlib import Path
 
 from grounded_rag.config import get_settings
 from grounded_rag.documents import Hit
+from grounded_rag.eval import beir, runner
 from grounded_rag.generate import GenerationError
 from grounded_rag.loaders import load_path
 from grounded_rag.pipeline import IndexStats
@@ -19,6 +21,9 @@ _PREVIEW_CHARS = 200
 def main(argv: Sequence[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    # One line per HTTP request to Qdrant or Anthropic would drown the real output.
+    for noisy in ("httpx", "httpx2"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
     # Retrieved text can contain characters the console encoding cannot represent.
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="replace")
@@ -49,6 +54,34 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--port", type=int, default=8000)
     serve.set_defaults(handler=_serve)
 
+    evaluate = commands.add_parser(
+        "eval", help="benchmark retrieval configurations on a BEIR dataset"
+    )
+    evaluate.add_argument("--dataset", default="scifact", help="BEIR dataset name")
+    evaluate.add_argument(
+        "--split",
+        default="test",
+        help="judgment split to score against; tune on train or dev, report on test",
+    )
+    evaluate.add_argument(
+        "--configs",
+        default=",".join(runner.CONFIGS),
+        help="comma-separated configurations; the first is the baseline",
+    )
+    evaluate.add_argument("--limit", type=int, help="evaluate only the first N queries")
+    evaluate.add_argument("--k", type=int, default=10, help="cutoff for the metrics")
+    evaluate.add_argument(
+        "--depth",
+        type=int,
+        default=40,
+        help="chunks retrieved per query before collapsing them to documents",
+    )
+    evaluate.add_argument("--reindex", action="store_true", help="rebuild the collection first")
+    evaluate.add_argument("--data-dir", type=Path, default=Path("data/beir"))
+    evaluate.add_argument("--out", type=Path, default=Path("results"))
+    evaluate.add_argument("--collection", help="collection name (default: beir_<dataset>)")
+    evaluate.set_defaults(handler=_eval)
+
     return parser
 
 
@@ -61,12 +94,8 @@ def _add_retrieval_options(parser: argparse.ArgumentParser) -> None:
 
 def _ingest(args: argparse.Namespace) -> int:
     services = build_services(get_settings(), collection=args.collection)
-
-    def report(stats: IndexStats) -> None:
-        print(f"\r{stats.documents} documents, {stats.chunks} chunks", end="", flush=True)
-
     try:
-        stats = services.indexer.index(load_path(args.path), on_progress=report)
+        stats = services.indexer.index(load_path(args.path), on_progress=_report_indexing)
     except FileNotFoundError:
         print(f"Path not found: {args.path}", file=sys.stderr)
         return 2
@@ -112,6 +141,86 @@ def _serve(args: argparse.Namespace) -> int:
 
     uvicorn.run(create_app(), host=args.host, port=args.port)
     return 0
+
+
+def _eval(args: argparse.Namespace) -> int:
+    names = [name.strip() for name in args.configs.split(",") if name.strip()]
+    unknown = [name for name in names if name not in runner.CONFIGS]
+    if unknown or not names:
+        print(
+            f"Unknown configuration(s): {', '.join(unknown) or '(none given)'}. "
+            f"Choose from: {', '.join(runner.CONFIGS)}.",
+            file=sys.stderr,
+        )
+        return 2
+
+    beir.download(args.dataset, args.data_dir)
+    dataset = beir.load(args.dataset, args.data_dir, args.split)
+    if args.limit:
+        dataset = runner.limit_queries(dataset, args.limit)
+
+    settings = get_settings()
+    services = build_services(settings, collection=args.collection or f"beir_{args.dataset}")
+    store = services.store
+    if args.reindex and store.count():
+        store.drop()
+    if store.count() == 0:
+        print(f"Indexing {len(dataset.corpus)} documents into '{store.collection}'...")
+        services.indexer.index(dataset.corpus, on_progress=_report_indexing)
+        print()
+    else:
+        print(
+            f"Reusing collection '{store.collection}' ({store.count()} chunks). "
+            "Pass --reindex after changing models or chunking."
+        )
+
+    runs = []
+    for name in names:
+
+        def report(done: int, total: int, name: str = name) -> None:
+            if done % 10 == 0 or done == total:
+                print(f"\r{name}: {done}/{total} queries", end="", flush=True)
+
+        runs.append(
+            runner.run_config(
+                services.retriever,
+                dataset,
+                runner.CONFIGS[name],
+                k=args.k,
+                depth=args.depth,
+                on_progress=report,
+            )
+        )
+        print()
+
+    report_data = runner.build_report(
+        dataset,
+        runs,
+        k=args.k,
+        depth=args.depth,
+        settings=settings,
+        corpus_chunks=store.count(),
+        vector_store=_vector_store_label(services),
+    )
+    markdown = runner.render_markdown(report_data)
+    args.out.mkdir(parents=True, exist_ok=True)
+    stem = dataset.name if dataset.split == "test" else f"{dataset.name}-{dataset.split}"
+    (args.out / f"{stem}.json").write_text(
+        json.dumps(report_data, indent=2) + "\n", encoding="utf-8"
+    )
+    (args.out / f"{stem}.md").write_text(markdown, encoding="utf-8")
+    print(f"\n{markdown}\nWrote {args.out / stem}.json and .md")
+    return 0
+
+
+def _vector_store_label(services: Services) -> str:
+    if not services.settings.qdrant_url:
+        return "Qdrant embedded"
+    return f"Qdrant server {services.store.client.info().version}"
+
+
+def _report_indexing(stats: IndexStats) -> None:
+    print(f"\r{stats.documents} documents, {stats.chunks} chunks", end="", flush=True)
 
 
 def _retrieve(services: Services, query: str, args: argparse.Namespace) -> list[Hit]:
