@@ -104,17 +104,23 @@ candidate first), so the same query always returns the same order.
 
 ```bash
 docker compose up -d qdrant
-RAG_QDRANT_URL=http://localhost:6333 uv run grounded-rag eval --dataset scifact
+RAG_QDRANT_URL=http://127.0.0.1:6333 uv run grounded-rag eval --dataset scifact
 
 # one point of the sweep
-RAG_RRF_K=60 RAG_QDRANT_URL=http://localhost:6333 uv run grounded-rag eval \
+RAG_RRF_K=60 RAG_QDRANT_URL=http://127.0.0.1:6333 uv run grounded-rag eval \
   --dataset scifact --split train --configs dense,hybrid --out data/sweep/k60
 ```
 
+Use `127.0.0.1` rather than `localhost` in the URL. Compose publishes Qdrant on IPv4
+only, and on Windows a connection to `localhost` first waits for IPv6 to fail, which
+made every request hundreds of times slower.
+
 Indexing the corpus takes 15 to 20 minutes on a laptop CPU. The three configurations
 without reranking then finish in seconds, and the reranked one takes about 11 minutes.
-On the same machine a rerun reproduces the quality metrics exactly; latency depends on
-the hardware. Other BEIR datasets use the same command, for example
+A rerun reproduces the quality metrics exactly; latency depends on the hardware. The
+committed report came from Python 3.12 in a Linux container, and a run on Windows with
+Python 3.14 against the same index matched it on every query for the three
+configurations without reranking. Other BEIR datasets use the same command, for example
 `--dataset nfcorpus`, but only SciFact has been run so far.
 
 ## Quickstart
