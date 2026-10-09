@@ -3,8 +3,8 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 from conftest import CORPUS
-from grounded_rag.api import create_app
-from grounded_rag.generate import GenerationError
+from rag.api import create_app
+from rag.generate import GenerationError
 
 
 @pytest.fixture
@@ -34,7 +34,7 @@ def test_index_page_is_served(client):
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "grounded-rag" in response.text
+    assert "rag" in response.text
 
 
 def test_search_uses_the_configured_defaults(client):

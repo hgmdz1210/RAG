@@ -1,4 +1,4 @@
-# grounded-rag
+# RAG
 
 A small retrieval-augmented generation service. It searches your documents with hybrid
 retrieval, reranks the candidates with a cross-encoder, and has Gemini answer from the
@@ -104,10 +104,10 @@ candidate first), so the same query always returns the same order.
 
 ```bash
 docker compose up -d qdrant
-RAG_QDRANT_URL=http://127.0.0.1:6333 uv run grounded-rag eval --dataset scifact
+RAG_QDRANT_URL=http://127.0.0.1:6333 uv run rag eval --dataset scifact
 
 # one point of the sweep
-RAG_RRF_K=60 RAG_QDRANT_URL=http://127.0.0.1:6333 uv run grounded-rag eval \
+RAG_RRF_K=60 RAG_QDRANT_URL=http://127.0.0.1:6333 uv run rag eval \
   --dataset scifact --split train --configs dense,hybrid --out data/sweep/k60
 ```
 
@@ -133,7 +133,7 @@ docker compose up --build -d  # Qdrant + API
 
 # Index the example documents, or put your own .pdf/.txt/.md files under ./data
 mkdir -p data && cp -r examples/docs data/docs
-docker compose exec api grounded-rag ingest data/docs
+docker compose exec api rag ingest data/docs
 ```
 
 Open <http://localhost:8000> for the demo page, or call the API:
@@ -155,10 +155,10 @@ Without `RAG_QDRANT_URL`, Qdrant runs embedded in the process and stores its dat
 
 ```bash
 uv sync
-uv run grounded-rag ingest examples/docs
-uv run grounded-rag search "why merge rankings by rank instead of score?"
-uv run grounded-rag ask "Why does hybrid search merge rankings by rank instead of score?"
-uv run grounded-rag serve
+uv run rag ingest examples/docs
+uv run rag search "why merge rankings by rank instead of score?"
+uv run rag ask "Why does hybrid search merge rankings by rank instead of score?"
+uv run rag serve
 ```
 
 Searching and benchmarking need no API key. `ask` needs a Gemini API key in
@@ -193,7 +193,7 @@ Settings are read from environment variables or `.env`. The main ones:
 | `RAG_API_KEY` | unset | When set, `/search` and `/ask` require it in `X-API-Key`. |
 
 The full list, including the embedding and reranking models, is in
-[`src/grounded_rag/config.py`](src/grounded_rag/config.py).
+[`src/rag/config.py`](src/rag/config.py).
 
 ## Design notes
 
@@ -245,7 +245,7 @@ uv run ruff check . && uv run ruff format --check .
 ```
 
 ```
-src/grounded_rag/
+src/rag/
   config.py        settings from RAG_* variables
   documents.py     Document, Chunk and Hit
   loaders.py       read .pdf / .txt / .md
@@ -268,6 +268,6 @@ On Windows machines with Smart App Control enabled, the gRPC binary that `qdrant
 imports may be blocked. Run the tools in the dev image instead:
 
 ```bash
-docker build --target dev -t grounded-rag-dev .
-docker run --rm -v "${PWD}:/app" grounded-rag-dev pytest
+docker build --target dev -t rag-dev .
+docker run --rm -v "${PWD}:/app" rag-dev pytest
 ```

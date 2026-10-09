@@ -1,8 +1,8 @@
 import pytest
 
 from conftest import CORPUS, FakeDense, FakeSparse
-from grounded_rag.documents import Document
-from grounded_rag.pipeline import Indexer
+from rag.documents import Document
+from rag.pipeline import Indexer
 
 
 def _search(store, mode, query, **kwargs):

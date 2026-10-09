@@ -15,11 +15,11 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-from grounded_rag import __version__
-from grounded_rag.config import SearchMode, get_settings
-from grounded_rag.documents import Hit
-from grounded_rag.generate import GenerationError
-from grounded_rag.services import Services, build_services
+from rag import __version__
+from rag.config import SearchMode, get_settings
+from rag.documents import Hit
+from rag.generate import GenerationError
+from rag.services import Services, build_services
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +81,7 @@ def create_app(services: Services | None = None) -> FastAPI:
             app.state.services = build_services(get_settings())
         yield
 
-    app = FastAPI(title="grounded-rag", version=__version__, lifespan=lifespan)
+    app = FastAPI(title="rag", version=__version__, lifespan=lifespan)
     if services is not None:
         app.state.services = services
 
@@ -125,7 +125,7 @@ def create_app(services: Services | None = None) -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     def index() -> str:
-        return files("grounded_rag").joinpath("static/index.html").read_text(encoding="utf-8")
+        return files("rag").joinpath("static/index.html").read_text(encoding="utf-8")
 
     @app.get("/health")
     def health(services: ServicesDep) -> HealthResponse:

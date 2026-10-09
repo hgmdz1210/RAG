@@ -5,10 +5,10 @@ from collections.abc import Sequence
 
 from qdrant_client import QdrantClient, models
 
-from grounded_rag.config import SearchMode
-from grounded_rag.documents import Chunk, Hit
-from grounded_rag.embeddings import SparseVector
-from grounded_rag.fusion import RRF_K, reciprocal_rank_fusion
+from rag.config import SearchMode
+from rag.documents import Chunk, Hit
+from rag.embeddings import SparseVector
+from rag.fusion import RRF_K, reciprocal_rank_fusion
 
 DENSE_VECTOR = "dense"
 SPARSE_VECTOR = "sparse"
@@ -132,7 +132,7 @@ class QdrantStore:
         In hybrid mode both searches go to Qdrant in one batch request, each returning
         its top ``candidate_k`` chunks, and the two rankings are merged here with
         reciprocal rank fusion. Fusing on this side keeps the order of tied chunks
-        fixed; see :func:`grounded_rag.fusion.reciprocal_rank_fusion`.
+        fixed; see :func:`rag.fusion.reciprocal_rank_fusion`.
         """
         has_sparse = sparse is not None and bool(sparse.indices)
         if mode == "dense":

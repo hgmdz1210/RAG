@@ -4,9 +4,9 @@ import zipfile
 import pytest
 
 from conftest import CORPUS
-from grounded_rag import cli
-from grounded_rag.documents import Chunk, Hit
-from grounded_rag.eval import beir, runner
+from rag import cli
+from rag.documents import Chunk, Hit
+from rag.eval import beir, runner
 
 QUERIES = {
     "q1": "term frequency and inverse document frequency",

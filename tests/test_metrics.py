@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from grounded_rag.eval.metrics import (
+from rag.eval.metrics import (
     bootstrap_ci,
     hit_at_k,
     mean,

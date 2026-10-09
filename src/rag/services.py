@@ -2,12 +2,12 @@
 
 from dataclasses import dataclass
 
-from grounded_rag.config import Settings
-from grounded_rag.embeddings import FastEmbedDense, FastEmbedSparse
-from grounded_rag.generate import GeminiGenerator, Generator
-from grounded_rag.pipeline import Indexer, Retriever
-from grounded_rag.rerank import FastEmbedReranker
-from grounded_rag.store import QdrantStore, make_client
+from rag.config import Settings
+from rag.embeddings import FastEmbedDense, FastEmbedSparse
+from rag.generate import GeminiGenerator, Generator
+from rag.pipeline import Indexer, Retriever
+from rag.rerank import FastEmbedReranker
+from rag.store import QdrantStore, make_client
 
 
 @dataclass(slots=True)

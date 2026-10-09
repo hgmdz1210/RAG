@@ -9,11 +9,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from grounded_rag.config import SearchMode, Settings
-from grounded_rag.documents import Hit
-from grounded_rag.eval import metrics
-from grounded_rag.eval.beir import BeirDataset
-from grounded_rag.pipeline import Retriever
+from rag.config import SearchMode, Settings
+from rag.documents import Hit
+from rag.eval import metrics
+from rag.eval.beir import BeirDataset
+from rag.pipeline import Retriever
 
 _BOOTSTRAP_RESAMPLES = 2000
 _BOOTSTRAP_SEED = 0

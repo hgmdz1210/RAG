@@ -4,7 +4,7 @@ import logging
 from collections.abc import Iterator
 from pathlib import Path
 
-from grounded_rag.documents import Document
+from rag.documents import Document
 
 logger = logging.getLogger(__name__)
 

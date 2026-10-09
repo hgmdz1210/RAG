@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from grounded_rag.config import Settings
+from rag.config import Settings
 
 
 def _settings(**values) -> Settings:

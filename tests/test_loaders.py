@@ -1,6 +1,6 @@
 import pytest
 
-from grounded_rag.loaders import load_path
+from rag.loaders import load_path
 
 
 def _minimal_pdf(text: str) -> bytes:

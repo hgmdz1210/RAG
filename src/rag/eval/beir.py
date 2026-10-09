@@ -13,7 +13,7 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from grounded_rag.documents import Document
+from rag.documents import Document
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ def _check_name(value: str) -> None:
 def _fetch(url: str, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     partial = path.with_name(path.name + ".part")
-    request = urllib.request.Request(url, headers={"User-Agent": "grounded-rag"})
+    request = urllib.request.Request(url, headers={"User-Agent": "rag"})
     with (
         urllib.request.urlopen(request, timeout=_TIMEOUT_SECONDS) as response,
         open(partial, "wb") as output,

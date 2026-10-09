@@ -7,13 +7,13 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from grounded_rag.config import get_settings
-from grounded_rag.documents import Hit
-from grounded_rag.eval import beir, runner
-from grounded_rag.generate import GenerationError
-from grounded_rag.loaders import load_path
-from grounded_rag.pipeline import IndexStats
-from grounded_rag.services import Services, build_services
+from rag.config import get_settings
+from rag.documents import Hit
+from rag.eval import beir, runner
+from rag.generate import GenerationError
+from rag.loaders import load_path
+from rag.pipeline import IndexStats
+from rag.services import Services, build_services
 
 _PREVIEW_CHARS = 200
 
@@ -33,7 +33,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="grounded-rag", description=__doc__)
+    parser = argparse.ArgumentParser(prog="rag", description=__doc__)
     commands = parser.add_subparsers(required=True, metavar="command")
 
     ingest = commands.add_parser("ingest", help="index a file or a folder of .pdf/.txt/.md files")
@@ -139,7 +139,7 @@ def _ask(args: argparse.Namespace) -> int:
 def _serve(args: argparse.Namespace) -> int:
     import uvicorn
 
-    from grounded_rag.api import create_app
+    from rag.api import create_app
 
     uvicorn.run(create_app(), host=args.host, port=args.port)
     return 0

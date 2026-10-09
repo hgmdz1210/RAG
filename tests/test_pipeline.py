@@ -1,8 +1,8 @@
 import pytest
 
 from conftest import CORPUS, FakeDense, FakeSparse
-from grounded_rag.documents import Document
-from grounded_rag.pipeline import Indexer, IndexStats, Retriever
+from rag.documents import Document
+from rag.pipeline import Indexer, IndexStats, Retriever
 
 
 def test_index_reports_documents_and_chunks(store, indexer):

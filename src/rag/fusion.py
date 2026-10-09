@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from grounded_rag.documents import Chunk, Hit
+from rag.documents import Chunk, Hit
 
 # The constant damps the difference between neighbouring ranks. The original RRF
 # paper (Cormack et al., 2009) used 60, which suits fusing many long rankings. With

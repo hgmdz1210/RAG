@@ -1,7 +1,7 @@
 import pytest
 
-from grounded_rag import cli
-from grounded_rag.generate import GenerationError
+from rag import cli
+from rag.generate import GenerationError
 
 
 @pytest.fixture

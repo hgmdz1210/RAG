@@ -4,8 +4,8 @@ import httpx
 import pytest
 from google.genai import errors, types
 
-from grounded_rag.documents import Chunk, Hit
-from grounded_rag.generate import (
+from rag.documents import Chunk, Hit
+from rag.generate import (
     NO_SOURCES_ANSWER,
     REFUSAL_ANSWER,
     SYSTEM_PROMPT,

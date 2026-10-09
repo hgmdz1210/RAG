@@ -2,7 +2,7 @@
 
 import uuid
 
-from grounded_rag.documents import Chunk, Document
+from rag.documents import Chunk, Document
 
 # Tried in order: paragraphs, lines, sentences, words.
 _SEPARATORS = ("\n\n", "\n", ". ", " ")

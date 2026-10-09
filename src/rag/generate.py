@@ -10,7 +10,7 @@ import httpx
 from google import genai
 from google.genai import errors, types
 
-from grounded_rag.documents import Hit
+from rag.documents import Hit
 
 logger = logging.getLogger(__name__)
 

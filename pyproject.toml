@@ -1,5 +1,5 @@
 [project]
-name = "grounded-rag"
+name = "rag"
 version = "0.1.0"
 description = "Hybrid-search RAG service with cited answers and a reproducible retrieval benchmark."
 readme = "README.md"
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-grounded-rag = "grounded_rag.cli:main"
+rag = "rag.cli:main"
 
 [dependency-groups]
 dev = [
@@ -29,7 +29,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/grounded_rag"]
+packages = ["src/rag"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

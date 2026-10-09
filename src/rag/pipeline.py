@@ -3,13 +3,13 @@
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
-from grounded_rag.chunking import chunk_document
-from grounded_rag.config import SearchMode
-from grounded_rag.documents import Chunk, Document, Hit
-from grounded_rag.embeddings import DenseEmbedder, SparseEmbedder
-from grounded_rag.fusion import RRF_K
-from grounded_rag.rerank import Reranker
-from grounded_rag.store import QdrantStore
+from rag.chunking import chunk_document
+from rag.config import SearchMode
+from rag.documents import Chunk, Document, Hit
+from rag.embeddings import DenseEmbedder, SparseEmbedder
+from rag.fusion import RRF_K
+from rag.rerank import Reranker
+from rag.store import QdrantStore
 
 
 @dataclass(frozen=True, slots=True)

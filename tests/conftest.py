@@ -14,13 +14,13 @@ from collections.abc import Sequence
 import pytest
 from qdrant_client import QdrantClient
 
-from grounded_rag.config import Settings
-from grounded_rag.documents import Document, Hit
-from grounded_rag.embeddings import SparseVector
-from grounded_rag.generate import Answer
-from grounded_rag.pipeline import Indexer, Retriever
-from grounded_rag.services import Services
-from grounded_rag.store import QdrantStore
+from rag.config import Settings
+from rag.documents import Document, Hit
+from rag.embeddings import SparseVector
+from rag.generate import Answer
+from rag.pipeline import Indexer, Retriever
+from rag.services import Services
+from rag.store import QdrantStore
 
 
 def tokenize(text: str) -> list[str]:
