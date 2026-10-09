@@ -1,0 +1,63 @@
+"""Runtime settings, read from ``RAG_*`` environment variables or a local ``.env`` file."""
+
+from functools import lru_cache
+from typing import Literal, Self
+
+from pydantic import AliasChoices, Field, SecretStr, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+SearchMode = Literal["dense", "sparse", "hybrid"]
+Effort = Literal["low", "medium", "high", "xhigh", "max"]
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="RAG_", env_file=".env", extra="ignore")
+
+    # Storage. With no URL the client runs Qdrant embedded, persisting to `qdrant_path`.
+    qdrant_url: str | None = None
+    qdrant_path: str = "data/qdrant"
+    collection: str = "documents"
+
+    # Models, all served through ONNX Runtime by fastembed.
+    dense_model: str = "BAAI/bge-small-en-v1.5"
+    # BGE v1.5 is trained with this instruction on the query side only.
+    dense_query_prefix: str = "Represent this sentence for searching relevant passages: "
+    sparse_model: str = "Qdrant/bm25"
+    rerank_model: str = "Xenova/ms-marco-MiniLM-L-6-v2"
+    model_cache_dir: str = "data/models"
+
+    # Chunking, in characters.
+    chunk_size: int = Field(default=1200, gt=0)
+    chunk_overlap: int = Field(default=150, ge=0)
+
+    # Retrieval defaults; each can be overridden per request.
+    search_mode: SearchMode = "hybrid"
+    top_k: int = Field(default=5, ge=1, le=50)
+    candidate_k: int = Field(default=30, ge=1, le=200)
+    rerank: bool = True
+
+    # Answer generation.
+    llm_model: str = "claude-opus-5-5"
+    llm_effort: Effort = "medium"
+    llm_max_tokens: int = Field(default=16000, gt=0)
+    # Re-run a request the model declines on Anthropic's recommended fallback model.
+    # Turn off for models without server-side fallback support (e.g. Haiku).
+    llm_refusal_fallback: bool = True
+    anthropic_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("ANTHROPIC_API_KEY", "RAG_ANTHROPIC_API_KEY"),
+    )
+
+    # When set, every API route except /health requires this value in X-API-Key.
+    api_key: SecretStr | None = None
+
+    @model_validator(mode="after")
+    def _overlap_smaller_than_chunk(self) -> Self:
+        if self.chunk_overlap >= self.chunk_size:
+            raise ValueError("chunk_overlap must be smaller than chunk_size")
+        return self
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
