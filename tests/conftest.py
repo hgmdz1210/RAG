@@ -14,9 +14,12 @@ from collections.abc import Sequence
 import pytest
 from qdrant_client import QdrantClient
 
-from grounded_rag.documents import Document
+from grounded_rag.config import Settings
+from grounded_rag.documents import Document, Hit
 from grounded_rag.embeddings import SparseVector
+from grounded_rag.generate import Answer
 from grounded_rag.pipeline import Indexer, Retriever
+from grounded_rag.services import Services
 from grounded_rag.store import QdrantStore
 
 
@@ -105,6 +108,20 @@ CORPUS = [
 ]
 
 
+class FakeGenerator:
+    """Cites the first source, or raises ``error`` when one is set."""
+
+    def __init__(self) -> None:
+        self.error: Exception | None = None
+
+    def answer(self, question: str, hits: Sequence[Hit]) -> Answer:
+        if self.error is not None:
+            raise self.error
+        if not hits:
+            return Answer(text="No sources.")
+        return Answer(text="Based on the first passage [1].", cited=[1], model="fake-model")
+
+
 @pytest.fixture
 def store() -> QdrantStore:
     return QdrantStore(QdrantClient(":memory:"), "test")
@@ -124,3 +141,21 @@ def reranker() -> FakeReranker:
 def retriever(store: QdrantStore, indexer: Indexer, reranker: FakeReranker) -> Retriever:
     indexer.index(CORPUS)
     return Retriever(store, FakeDense(), FakeSparse(), reranker)
+
+
+@pytest.fixture
+def services(store: QdrantStore, indexer: Indexer, reranker: FakeReranker) -> Services:
+    """Fully wired services over an empty collection."""
+    return Services(
+        settings=Settings(_env_file=None),
+        store=store,
+        indexer=indexer,
+        retriever=Retriever(store, FakeDense(), FakeSparse(), reranker),
+        generator=FakeGenerator(),
+    )
+
+
+@pytest.fixture
+def indexed_services(services: Services) -> Services:
+    services.indexer.index(CORPUS)
+    return services
