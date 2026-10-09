@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal, Self
 
-from pydantic import AliasChoices, Field, SecretStr, model_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 SearchMode = Literal["dense", "sparse", "hybrid"]
@@ -50,6 +50,12 @@ class Settings(BaseSettings):
 
     # When set, every API route except /health requires this value in X-API-Key.
     api_key: SecretStr | None = None
+
+    @field_validator("qdrant_url", "anthropic_api_key", "api_key", mode="before")
+    @classmethod
+    def _blank_means_unset(cls, value: object) -> object:
+        # `KEY=` in a .env file arrives as an empty string, not as a missing value.
+        return None if isinstance(value, str) and not value.strip() else value
 
     @model_validator(mode="after")
     def _overlap_smaller_than_chunk(self) -> Self:
