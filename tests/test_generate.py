@@ -1,15 +1,15 @@
 from types import SimpleNamespace
 
-import anthropic
-import httpx2
+import httpx
 import pytest
+from google.genai import errors, types
 
 from grounded_rag.documents import Chunk, Hit
 from grounded_rag.generate import (
     NO_SOURCES_ANSWER,
     REFUSAL_ANSWER,
     SYSTEM_PROMPT,
-    ClaudeGenerator,
+    GeminiGenerator,
     GenerationError,
     build_user_message,
     extract_citations,
@@ -35,43 +35,36 @@ HITS = [
 ]
 
 
-class _Endpoint:
+class FakeClient:
+    """Mimics ``client.models.generate_content``."""
+
     def __init__(self, outcome):
         self.outcome = outcome
         self.calls: list[dict] = []
+        self.models = SimpleNamespace(generate_content=self._generate)
 
-    def create(self, **kwargs):
+    def _generate(self, **kwargs):
         self.calls.append(kwargs)
         if isinstance(self.outcome, Exception):
             raise self.outcome
         return self.outcome
 
 
-class FakeClient:
-    """Mimics the two SDK entry points the generator may call."""
-
-    def __init__(self, outcome):
-        self.messages = _Endpoint(outcome)
-        self.beta = SimpleNamespace(messages=_Endpoint(outcome))
-
-
-def _response(text: str, stop_reason: str = "end_turn", model: str = "claude-opus-5-5"):
-    content = [
-        SimpleNamespace(type="thinking", thinking=""),
-        SimpleNamespace(type="text", text=text),
-    ]
-    return SimpleNamespace(content=content, stop_reason=stop_reason, model=model)
+def _response(text: str | None, finish_reason=types.FinishReason.STOP, candidates: int = 1):
+    return SimpleNamespace(
+        text=text,
+        candidates=[SimpleNamespace(finish_reason=finish_reason)] * candidates,
+        model_version="gemini-3.8-flash",
+    )
 
 
-def _generator(outcome, **overrides) -> tuple[ClaudeGenerator, FakeClient]:
+def _generator(outcome) -> tuple[GeminiGenerator, FakeClient]:
     client = FakeClient(outcome)
-    options = {"model": "claude-opus-5-5", "max_tokens": 1000, "effort": "medium"}
-    return ClaudeGenerator(**(options | overrides), client=client), client
+    return GeminiGenerator(model="gemini-3.8-flash", max_tokens=1000, client=client), client
 
 
-def _status_error(cls, status: int):
-    request = httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
-    return cls("boom", response=httpx2.Response(status, request=request), body=None)
+def _api_error(cls, code: int):
+    return cls(code, {"error": {"code": code, "message": "boom", "status": "FAILED"}})
 
 
 def test_user_message_numbers_sources_and_ends_with_the_question():
@@ -120,26 +113,13 @@ def test_answer_returns_text_citations_and_model():
 
     assert answer.text == "Rare terms weigh more [1]."
     assert answer.cited == [1]
-    assert answer.model == "claude-opus-5-5"
+    assert answer.model == "gemini-3.8-flash"
     assert not answer.refused
-    (call,) = client.beta.messages.calls
-    assert call["system"] == SYSTEM_PROMPT
-    assert call["output_config"] == {"effort": "medium"}
-    assert call["fallbacks"] == "default"
-    assert "What does BM25 reward?" in call["messages"][0]["content"]
-    assert "thinking" not in call
-    assert client.messages.calls == []
-
-
-def test_fallback_can_be_turned_off():
-    generator, client = _generator(_response("Answer [2]."), refusal_fallback=False)
-
-    generator.answer("q", HITS)
-
-    (call,) = client.messages.calls
-    assert "fallbacks" not in call
-    assert "betas" not in call
-    assert client.beta.messages.calls == []
+    (call,) = client.calls
+    assert call["model"] == "gemini-3.8-flash"
+    assert call["config"].system_instruction == SYSTEM_PROMPT
+    assert call["config"].max_output_tokens == 1000
+    assert "What does BM25 reward?" in call["contents"]
 
 
 def test_no_hits_skips_the_model_call():
@@ -149,11 +129,11 @@ def test_no_hits_skips_the_model_call():
 
     assert answer.text == NO_SOURCES_ANSWER
     assert answer.cited == []
-    assert client.beta.messages.calls == []
+    assert client.calls == []
 
 
-def test_refusal_is_reported_without_reading_content():
-    generator, _ = _generator(_response("", stop_reason="refusal"))
+def test_a_blocked_prompt_is_reported_as_a_refusal():
+    generator, _ = _generator(_response(None, candidates=0))
 
     answer = generator.answer("q", HITS)
 
@@ -161,15 +141,29 @@ def test_refusal_is_reported_without_reading_content():
     assert answer.text == REFUSAL_ANSWER
 
 
+def test_a_blocked_answer_is_reported_as_a_refusal():
+    generator, _ = _generator(_response(None, finish_reason=types.FinishReason.SAFETY))
+
+    assert generator.answer("q", HITS).refused
+
+
+def test_a_truncated_answer_is_still_returned():
+    generator, _ = _generator(_response("Partial [2]", finish_reason=types.FinishReason.MAX_TOKENS))
+
+    answer = generator.answer("q", HITS)
+
+    assert answer.text == "Partial [2]"
+    assert not answer.refused
+
+
 @pytest.mark.parametrize(
     ("error", "retryable"),
     [
-        (_status_error(anthropic.AuthenticationError, 401), False),
-        (_status_error(anthropic.RateLimitError, 429), True),
-        (_status_error(anthropic.InternalServerError, 500), True),
-        (_status_error(anthropic.BadRequestError, 400), False),
-        (anthropic.APIConnectionError(request=httpx2.Request("POST", "https://x")), True),
-        (TypeError("Could not resolve authentication method."), False),
+        (_api_error(errors.ClientError, 403), False),
+        (_api_error(errors.ClientError, 429), True),
+        (_api_error(errors.ClientError, 400), False),
+        (_api_error(errors.ServerError, 503), True),
+        (httpx.ConnectError("no route"), True),
     ],
 )
 def test_sdk_errors_become_generation_errors(error, retryable):
@@ -180,3 +174,12 @@ def test_sdk_errors_become_generation_errors(error, retryable):
 
     assert raised.value.retryable is retryable
     assert raised.value.__cause__ is error
+
+
+def test_a_missing_api_key_is_reported(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    generator = GeminiGenerator(model="gemini-3.8-flash", max_tokens=1000)
+
+    with pytest.raises(GenerationError, match="GEMINI_API_KEY"):
+        generator.answer("q", HITS)

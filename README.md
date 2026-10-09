@@ -1,7 +1,7 @@
 # grounded-rag
 
 A small retrieval-augmented generation service. It searches your documents with hybrid
-retrieval, reranks the candidates with a cross-encoder, and has Claude answer from the
+retrieval, reranks the candidates with a cross-encoder, and has Gemini answer from the
 top passages, citing each one it relies on.
 
 It ships with a retrieval benchmark on human-labelled data, so the retrieval choices
@@ -17,7 +17,7 @@ flowchart LR
     end
     subgraph Answering
         direction LR
-        U[Question] --> S["Hybrid search<br/>rank fusion"] --> R["Cross-encoder<br/>rerank"] --> G["Claude<br/>cited answer"]
+        U[Question] --> S["Hybrid search<br/>rank fusion"] --> R["Cross-encoder<br/>rerank"] --> G["Gemini<br/>cited answer"]
     end
     Q --> S
 ```
@@ -28,7 +28,7 @@ flowchart LR
 - **Optional reranking.** A cross-encoder (`ms-marco-MiniLM-L-6-v2`) can rescore the
   retrieved candidates against the question. It is off by default, for the reason shown
   in the benchmark.
-- **Cited answers.** Claude receives the top passages as numbered sources and is told to
+- **Cited answers.** Gemini receives the top passages as numbered sources and is told to
   answer only from them. The response says which sources were cited.
 - **No PyTorch.** All three models run on ONNX Runtime through
   [fastembed](https://github.com/qdrant/fastembed), on CPU.
@@ -128,7 +128,7 @@ configurations without reranking. Other BEIR datasets use the same command, for 
 ### Docker Compose
 
 ```bash
-cp .env.example .env          # add ANTHROPIC_API_KEY to enable answers
+cp .env.example .env          # add GEMINI_API_KEY to enable answers
 docker compose up --build -d  # Qdrant + API
 
 # Index the example documents, or put your own .pdf/.txt/.md files under ./data
@@ -161,8 +161,8 @@ uv run grounded-rag ask "Why does hybrid search merge rankings by rank instead o
 uv run grounded-rag serve
 ```
 
-Searching and benchmarking need no API key. `ask` needs Anthropic credentials, either
-`ANTHROPIC_API_KEY` or a profile created with `ant auth login`.
+Searching and benchmarking need no API key. `ask` needs a Gemini API key in
+`GEMINI_API_KEY`.
 
 ## API
 
@@ -189,7 +189,7 @@ Settings are read from environment variables or `.env`. The main ones:
 | `RAG_RRF_K` | `2` | Rank fusion constant. Smaller values let top ranks dominate. |
 | `RAG_RERANK` | `false` | Rerank by default. A request can still ask for it. |
 | `RAG_CHUNK_SIZE` / `RAG_CHUNK_OVERLAP` | `1200` / `150` | Chunking, in characters. |
-| `RAG_LLM_MODEL` | `claude-opus-5-5` | Model that writes the answer. |
+| `RAG_LLM_MODEL` | `gemini-3.8-flash` | Model that writes the answer. |
 | `RAG_API_KEY` | unset | When set, `/search` and `/ask` require it in `X-API-Key`. |
 
 The full list, including the embedding and reranking models, is in
@@ -223,7 +223,7 @@ The full list, including the embedding and reranking models, is in
 ## Limitations
 
 - **Only retrieval is measured.** Whether the generated answers are faithful to their
-  sources, and whether the citations are right, is not evaluated. The Claude call is
+  sources, and whether the citations are right, is not evaluated. The Gemini call is
   covered by unit tests against a stubbed client, not by a live test.
 - **One dataset, one domain.** SciFact documents are short abstracts that mostly fit in
   one or two chunks, so the benchmark says little about chunking long documents.
@@ -255,7 +255,7 @@ src/grounded_rag/
   store.py         Qdrant collection: dense, sparse and hybrid search
   fusion.py        reciprocal rank fusion with a fixed tie-break
   pipeline.py      Indexer and Retriever
-  generate.py      prompt, Claude call, citation extraction
+  generate.py      prompt, Gemini call, citation extraction
   services.py      builds the pipeline from settings
   api.py           FastAPI app
   cli.py           ingest / search / ask / serve / eval

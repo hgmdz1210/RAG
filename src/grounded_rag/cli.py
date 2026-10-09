@@ -21,8 +21,8 @@ _PREVIEW_CHARS = 200
 def main(argv: Sequence[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    # One line per HTTP request to Qdrant or Anthropic would drown the real output.
-    for noisy in ("httpx", "httpx2"):
+    # One line per HTTP request to Qdrant or Gemini would drown the real output.
+    for noisy in ("httpx", "google_genai"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
     # Reports and retrieved text contain non-ASCII characters. On Windows a piped
     # stream defaults to a legacy code page that mangles them, so write UTF-8.

@@ -9,7 +9,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from grounded_rag.fusion import RRF_K
 
 SearchMode = Literal["dense", "sparse", "hybrid"]
-Effort = Literal["low", "medium", "high", "xhigh", "max"]
 
 
 class Settings(BaseSettings):
@@ -43,21 +42,17 @@ class Settings(BaseSettings):
     rerank: bool = False
 
     # Answer generation.
-    llm_model: str = "claude-opus-5-5"
-    llm_effort: Effort = "medium"
-    llm_max_tokens: int = Field(default=16000, gt=0)
-    # Re-run a request the model declines on Anthropic's recommended fallback model.
-    # Turn off for models without server-side fallback support (e.g. Haiku).
-    llm_refusal_fallback: bool = True
-    anthropic_api_key: SecretStr | None = Field(
+    llm_model: str = "gemini-3.8-flash"
+    llm_max_tokens: int = Field(default=8192, gt=0)
+    gemini_api_key: SecretStr | None = Field(
         default=None,
-        validation_alias=AliasChoices("ANTHROPIC_API_KEY", "RAG_ANTHROPIC_API_KEY"),
+        validation_alias=AliasChoices("GEMINI_API_KEY", "GOOGLE_API_KEY", "RAG_GEMINI_API_KEY"),
     )
 
     # When set, every API route except /health requires this value in X-API-Key.
     api_key: SecretStr | None = None
 
-    @field_validator("qdrant_url", "anthropic_api_key", "api_key", mode="before")
+    @field_validator("qdrant_url", "gemini_api_key", "api_key", mode="before")
     @classmethod
     def _blank_means_unset(cls, value: object) -> object:
         # `KEY=` in a .env file arrives as an empty string, not as a missing value.

@@ -11,25 +11,25 @@ def _settings(**values) -> Settings:
 def test_environment_variables_override_defaults(monkeypatch):
     monkeypatch.setenv("RAG_TOP_K", "9")
     monkeypatch.setenv("RAG_SEARCH_MODE", "dense")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    monkeypatch.setenv("GEMINI_API_KEY", "sk-test")
 
     settings = _settings()
 
     assert settings.top_k == 9
     assert settings.search_mode == "dense"
-    assert settings.anthropic_api_key.get_secret_value() == "sk-test"
+    assert settings.gemini_api_key.get_secret_value() == "sk-test"
 
 
 def test_blank_values_are_treated_as_unset(monkeypatch):
     monkeypatch.setenv("RAG_API_KEY", "")
     monkeypatch.setenv("RAG_QDRANT_URL", "  ")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    monkeypatch.setenv("GEMINI_API_KEY", "")
 
     settings = _settings()
 
     assert settings.api_key is None
     assert settings.qdrant_url is None
-    assert settings.anthropic_api_key is None
+    assert settings.gemini_api_key is None
 
 
 def test_secrets_are_not_shown_in_repr(monkeypatch):

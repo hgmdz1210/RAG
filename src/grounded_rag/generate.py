@@ -6,7 +6,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-import anthropic
+import httpx
+from google import genai
+from google.genai import errors, types
 
 from grounded_rag.documents import Hit
 
@@ -32,7 +34,9 @@ Write a short, direct answer in the language of the question."""
 NO_SOURCES_ANSWER = "I could not find anything relevant in the indexed documents."
 REFUSAL_ANSWER = "The model declined to answer this question."
 
-_FALLBACK_BETA = "server-side-fallback-2026-07-01"
+_TIMEOUT_MS = 120_000
+_STOP = types.FinishReason.STOP
+_MAX_TOKENS = types.FinishReason.MAX_TOKENS
 _CITATION = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
 _SOURCE_TAG = re.compile(r"<(?=/?\s*sources?\b)", re.IGNORECASE)
 
@@ -84,33 +88,33 @@ def extract_citations(text: str, source_count: int) -> list[int]:
     return sorted(cited)
 
 
-class ClaudeGenerator:
+class GeminiGenerator:
     def __init__(
         self,
         *,
         model: str,
         max_tokens: int,
-        effort: str,
-        refusal_fallback: bool = True,
         api_key: str | None = None,
         client: Any | None = None,
     ) -> None:
         self.model = model
         self.max_tokens = max_tokens
-        self.effort = effort
-        self.refusal_fallback = refusal_fallback
         self._api_key = api_key
         self._client = client
 
     @property
     def client(self) -> Any:
         if self._client is None:
-            options: dict[str, Any] = {"timeout": 120.0, "max_retries": 3}
-            if self._api_key:
-                options["api_key"] = self._api_key
-            # Without an explicit key the SDK resolves credentials itself, from
-            # ANTHROPIC_API_KEY or a stored `ant auth login` profile.
-            self._client = anthropic.Anthropic(**options)
+            options = types.HttpOptions(
+                timeout=_TIMEOUT_MS, retry_options=types.HttpRetryOptions(attempts=3)
+            )
+            try:
+                # Without an explicit key the SDK reads GEMINI_API_KEY or GOOGLE_API_KEY.
+                self._client = genai.Client(api_key=self._api_key, http_options=options)
+            except ValueError as error:
+                raise GenerationError(
+                    "No Gemini API key found. Set GEMINI_API_KEY in the environment or .env."
+                ) from error
         return self._client
 
     def answer(self, question: str, hits: Sequence[Hit]) -> Answer:
@@ -118,47 +122,40 @@ class ClaudeGenerator:
             # Nothing was retrieved, so there is nothing to ground an answer on.
             return Answer(text=NO_SOURCES_ANSWER)
 
-        request: dict[str, Any] = {
-            "model": self.model,
-            "max_tokens": self.max_tokens,
-            "system": SYSTEM_PROMPT,
-            "output_config": {"effort": self.effort},
-            "messages": [{"role": "user", "content": build_user_message(question, hits)}],
-        }
-        response = self._send(request)
+        response = self._send(build_user_message(question, hits))
+        model = response.model_version or self.model
+        candidate = response.candidates[0] if response.candidates else None
+        reason = candidate.finish_reason if candidate else None
 
-        if response.stop_reason == "refusal":
-            return Answer(text=REFUSAL_ANSWER, model=response.model, refused=True)
-        if response.stop_reason == "max_tokens":
+        # A blocked prompt comes back with no candidates; a blocked answer comes
+        # back with a finish reason other than a normal stop or the length limit.
+        if candidate is None or reason not in (None, _STOP, _MAX_TOKENS):
+            return Answer(text=REFUSAL_ANSWER, model=model, refused=True)
+        if reason == _MAX_TOKENS:
             logger.warning("Answer was cut off at max_tokens=%d", self.max_tokens)
-        text = "".join(block.text for block in response.content if block.type == "text").strip()
-        return Answer(text=text, cited=extract_citations(text, len(hits)), model=response.model)
+        text = (response.text or "").strip()
+        return Answer(text=text, cited=extract_citations(text, len(hits)), model=model)
 
-    def _send(self, request: dict[str, Any]) -> Any:
+    def _send(self, user_message: str) -> Any:
+        client = self.client
         try:
-            if self.refusal_fallback:
-                # If a safety classifier declines the request, the API re-runs it
-                # on Anthropic's recommended fallback model within the same call.
-                return self.client.beta.messages.create(
-                    **request, betas=[_FALLBACK_BETA], fallbacks="default"
-                )
-            return self.client.messages.create(**request)
-        except anthropic.AuthenticationError as error:
-            raise GenerationError("Anthropic credentials were rejected.") from error
-        except anthropic.RateLimitError as error:
-            raise GenerationError("Rate limited by the Anthropic API.", retryable=True) from error
-        except anthropic.APIStatusError as error:
+            return client.models.generate_content(
+                model=self.model,
+                contents=user_message,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT, max_output_tokens=self.max_tokens
+                ),
+            )
+        except errors.APIError as error:
+            if error.code in (401, 403):
+                raise GenerationError("The Gemini API key was rejected.") from error
+            if error.code == 429:
+                raise GenerationError("Rate limited by the Gemini API.", retryable=True) from error
             raise GenerationError(
-                f"Anthropic API returned HTTP {error.status_code}.",
-                retryable=error.status_code >= 500,
+                f"Gemini API returned HTTP {error.code}.", retryable=(error.code or 0) >= 500
             ) from error
-        except anthropic.APIConnectionError as error:
-            raise GenerationError("Could not reach the Anthropic API.", retryable=True) from error
-        except TypeError as error:
-            # The SDK raises a bare TypeError when it finds no credentials at all.
-            raise GenerationError(
-                "No Anthropic credentials found. Set ANTHROPIC_API_KEY or run `ant auth login`."
-            ) from error
+        except httpx.HTTPError as error:
+            raise GenerationError("Could not reach the Gemini API.", retryable=True) from error
 
 
 def _attribute(value: str) -> str:

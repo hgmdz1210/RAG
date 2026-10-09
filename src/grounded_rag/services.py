@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from grounded_rag.config import Settings
 from grounded_rag.embeddings import FastEmbedDense, FastEmbedSparse
-from grounded_rag.generate import ClaudeGenerator, Generator
+from grounded_rag.generate import GeminiGenerator, Generator
 from grounded_rag.pipeline import Indexer, Retriever
 from grounded_rag.rerank import FastEmbedReranker
 from grounded_rag.store import QdrantStore, make_client
@@ -31,7 +31,7 @@ def build_services(settings: Settings, *, collection: str | None = None) -> Serv
     client = make_client(settings.qdrant_url, settings.qdrant_path)
     store = QdrantStore(client, collection or settings.collection)
 
-    api_key = settings.anthropic_api_key
+    api_key = settings.gemini_api_key
     return Services(
         settings=settings,
         store=store,
@@ -43,11 +43,9 @@ def build_services(settings: Settings, *, collection: str | None = None) -> Serv
             chunk_overlap=settings.chunk_overlap,
         ),
         retriever=Retriever(store, dense, sparse, reranker, rrf_k=settings.rrf_k),
-        generator=ClaudeGenerator(
+        generator=GeminiGenerator(
             model=settings.llm_model,
             max_tokens=settings.llm_max_tokens,
-            effort=settings.llm_effort,
-            refusal_fallback=settings.llm_refusal_fallback,
             api_key=api_key.get_secret_value() if api_key else None,
         ),
     )
