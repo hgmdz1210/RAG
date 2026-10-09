@@ -24,9 +24,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     # One line per HTTP request to Qdrant or Anthropic would drown the real output.
     for noisy in ("httpx", "httpx2"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
-    # Retrieved text can contain characters the console encoding cannot represent.
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(errors="replace")
+    # Reports and retrieved text contain non-ASCII characters. On Windows a piped
+    # stream defaults to a legacy code page that mangles them, so write UTF-8.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     return args.handler(args)
 
 
