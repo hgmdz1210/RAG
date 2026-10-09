@@ -7,6 +7,7 @@ from grounded_rag.chunking import chunk_document
 from grounded_rag.config import SearchMode
 from grounded_rag.documents import Chunk, Document, Hit
 from grounded_rag.embeddings import DenseEmbedder, SparseEmbedder
+from grounded_rag.fusion import RRF_K
 from grounded_rag.rerank import Reranker
 from grounded_rag.store import QdrantStore
 
@@ -88,11 +89,14 @@ class Retriever:
         dense: DenseEmbedder,
         sparse: SparseEmbedder,
         reranker: Reranker | None = None,
+        *,
+        rrf_k: int = RRF_K,
     ) -> None:
         self.store = store
         self.dense = dense
         self.sparse = sparse
         self.reranker = reranker
+        self.rrf_k = rrf_k
 
     def retrieve(
         self,
@@ -119,7 +123,12 @@ class Retriever:
         sparse = self.sparse.embed_query(query) if mode != "dense" else None
         limit = max(top_k, candidate_k) if rerank else top_k
         hits = self.store.search(
-            mode, dense=dense, sparse=sparse, limit=limit, candidate_k=candidate_k
+            mode,
+            dense=dense,
+            sparse=sparse,
+            limit=limit,
+            candidate_k=candidate_k,
+            rrf_k=self.rrf_k,
         )
 
         if rerank and hits:

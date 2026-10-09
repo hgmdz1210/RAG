@@ -6,6 +6,8 @@ from typing import Literal, Self
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from grounded_rag.fusion import RRF_K
+
 SearchMode = Literal["dense", "sparse", "hybrid"]
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
 
@@ -34,6 +36,8 @@ class Settings(BaseSettings):
     search_mode: SearchMode = "hybrid"
     top_k: int = Field(default=5, ge=1, le=50)
     candidate_k: int = Field(default=30, ge=1, le=200)
+    # Constant in reciprocal rank fusion. Smaller values let top ranks dominate.
+    rrf_k: int = Field(default=RRF_K, ge=0)
     rerank: bool = True
 
     # Answer generation.

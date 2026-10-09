@@ -93,3 +93,13 @@ def test_dimension_mismatch_is_reported(store):
 
     with pytest.raises(ValueError, match="256-dimensional"):
         store.ensure_collection(384)
+
+
+def test_hybrid_returns_the_same_order_on_repeated_calls(store, indexer):
+    indexer.index(CORPUS)
+    query = "vectors passages rankings chunks"
+
+    first = [hit.chunk.chunk_id for hit in _search(store, "hybrid", query, limit=5)]
+
+    for _ in range(5):
+        assert [hit.chunk.chunk_id for hit in _search(store, "hybrid", query, limit=5)] == first

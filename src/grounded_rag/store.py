@@ -8,6 +8,7 @@ from qdrant_client import QdrantClient, models
 from grounded_rag.config import SearchMode
 from grounded_rag.documents import Chunk, Hit
 from grounded_rag.embeddings import SparseVector
+from grounded_rag.fusion import RRF_K, reciprocal_rank_fusion
 
 DENSE_VECTOR = "dense"
 SPARSE_VECTOR = "sparse"
@@ -124,12 +125,14 @@ class QdrantStore:
         sparse: SparseVector | None = None,
         limit: int = 10,
         candidate_k: int = 30,
+        rrf_k: int = RRF_K,
     ) -> list[Hit]:
         """Return the top ``limit`` chunks.
 
-        In hybrid mode each signal contributes its top ``candidate_k`` chunks and the
-        two rankings are merged with reciprocal rank fusion. RRF uses only ranks, so
-        cosine similarities and BM25 scores never have to be put on a common scale.
+        In hybrid mode both searches go to Qdrant in one batch request, each returning
+        its top ``candidate_k`` chunks, and the two rankings are merged here with
+        reciprocal rank fusion. Fusing on this side keeps the order of tied chunks
+        fixed; see :func:`grounded_rag.fusion.reciprocal_rank_fusion`.
         """
         has_sparse = sparse is not None and bool(sparse.indices)
         if mode == "dense":
@@ -151,17 +154,24 @@ class QdrantStore:
             if dense is None or sparse is None:
                 raise ValueError("hybrid search needs both a dense and a sparse query vector")
             depth = max(limit, candidate_k)
-            prefetch = [models.Prefetch(query=list(dense), using=DENSE_VECTOR, limit=depth)]
-            if has_sparse:
-                prefetch.append(
-                    models.Prefetch(query=_to_qdrant(sparse), using=SPARSE_VECTOR, limit=depth)
+            requests = [
+                models.QueryRequest(
+                    query=list(dense), using=DENSE_VECTOR, limit=depth, with_payload=True
                 )
-            response = self.client.query_points(
-                self.collection,
-                prefetch=prefetch,
-                query=models.FusionQuery(fusion=models.Fusion.RRF),
-                limit=limit,
-            )
+            ]
+            if has_sparse:
+                requests.append(
+                    models.QueryRequest(
+                        query=_to_qdrant(sparse),
+                        using=SPARSE_VECTOR,
+                        limit=depth,
+                        with_payload=True,
+                    )
+                )
+            responses = self.client.query_batch_points(self.collection, requests=requests)
+            # Dense goes first, so ties between the two retrievers resolve in its favour.
+            rankings = [[_to_hit(point) for point in response.points] for response in responses]
+            return reciprocal_rank_fusion(rankings, k=rrf_k)[:limit]
         else:
             raise ValueError(f"unknown search mode: {mode!r}")
         return [_to_hit(point) for point in response.points]

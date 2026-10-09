@@ -42,7 +42,7 @@ def build_services(settings: Settings, *, collection: str | None = None) -> Serv
             chunk_size=settings.chunk_size,
             chunk_overlap=settings.chunk_overlap,
         ),
-        retriever=Retriever(store, dense, sparse, reranker),
+        retriever=Retriever(store, dense, sparse, reranker, rrf_k=settings.rrf_k),
         generator=ClaudeGenerator(
             model=settings.llm_model,
             max_tokens=settings.llm_max_tokens,

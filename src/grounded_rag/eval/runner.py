@@ -184,6 +184,7 @@ def build_report(
             "rerank_model": settings.rerank_model,
             "chunk_size": settings.chunk_size,
             "chunk_overlap": settings.chunk_overlap,
+            "rrf_k": settings.rrf_k,
         },
         "environment": {
             "python": platform.python_version(),

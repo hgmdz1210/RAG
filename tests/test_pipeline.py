@@ -98,3 +98,19 @@ def test_rerank_without_a_reranker_is_rejected(store, indexer):
 def test_empty_query_is_rejected(retriever):
     with pytest.raises(ValueError, match="empty"):
         retriever.retrieve("   ")
+
+
+def test_retriever_passes_its_fusion_constant_to_the_store(store, indexer, monkeypatch):
+    indexer.index(CORPUS)
+    seen = {}
+    original = store.search
+
+    def spy(mode, **kwargs):
+        seen.update(kwargs)
+        return original(mode, **kwargs)
+
+    monkeypatch.setattr(store, "search", spy)
+
+    Retriever(store, FakeDense(), FakeSparse(), rrf_k=7).retrieve("vectors", mode="hybrid")
+
+    assert seen["rrf_k"] == 7
