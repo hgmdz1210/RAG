@@ -38,7 +38,9 @@ class Settings(BaseSettings):
     candidate_k: int = Field(default=30, ge=1, le=200)
     # Constant in reciprocal rank fusion. Smaller values let top ranks dominate.
     rrf_k: int = Field(default=RRF_K, ge=0)
-    rerank: bool = True
+    # Off by default: on the benchmark in results/ the cross-encoder cost about two
+    # seconds per query on CPU without improving the ranking. Measure before enabling.
+    rerank: bool = False
 
     # Answer generation.
     llm_model: str = "claude-opus-5-5"

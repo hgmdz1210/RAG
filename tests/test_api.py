@@ -43,20 +43,26 @@ def test_search_uses_the_configured_defaults(client):
     assert response.status_code == 200
     body = response.json()
     assert body["mode"] == "hybrid"
-    assert body["reranked"] is True
+    assert body["reranked"] is False
     assert body["hits"][0]["doc_id"] == "bm25.md"
     assert [hit["number"] for hit in body["hits"]] == list(range(1, len(body["hits"]) + 1))
 
 
 def test_search_honours_request_overrides(client, indexed_services):
     response = client.post(
-        "/search", json={"query": "dense vectors", "mode": "sparse", "top_k": 1, "rerank": False}
+        "/search", json={"query": "dense vectors", "mode": "sparse", "top_k": 1, "rerank": True}
     )
 
     body = response.json()
     assert body["mode"] == "sparse"
-    assert body["reranked"] is False
+    assert body["reranked"] is True
     assert len(body["hits"]) == 1
+    assert len(indexed_services.retriever.reranker.calls) == 1
+
+
+def test_reranker_is_not_called_unless_requested(client, indexed_services):
+    client.post("/search", json={"query": "dense vectors"})
+
     assert indexed_services.retriever.reranker.calls == []
 
 
