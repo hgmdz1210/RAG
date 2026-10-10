@@ -9,16 +9,29 @@ below.
 ## How it works
 
 ```mermaid
-flowchart LR
-    subgraph Indexing
+flowchart TB
+    User([User]) --> UI["Streamlit app"]
+    UI -- "sign in" --> Auth["Supabase Auth"]
+    UI -- "access token" --> API["FastAPI"]
+    API -. "verify token" .-> Auth
+
+    subgraph Upload["Upload a document"]
         direction LR
-        F[".pdf / .txt / .md"] --> C[Chunk] --> E["Embed<br/>dense + BM25"] --> Q[(Qdrant)]
+        Parse["Parse<br/>PDF / TXT / MD"] --> Chunk["Chunk"] --> Embed["Embed<br/>dense + BM25"]
     end
-    subgraph Answering
+
+    subgraph Ask["Ask a question"]
         direction LR
-        U[Question] --> S["Hybrid search<br/>rank fusion"] --> R["Optional<br/>rerank"] --> G["Gemini<br/>cited answer"]
+        Search["Hybrid search<br/>user's chunks only"] --> Fuse["Rank fusion<br/>(RRF)"] --> Rerank["Rerank<br/>(optional)"] --> Answer["Gemini<br/>cited answer"]
     end
-    Q --> S
+
+    API --> Parse
+    API --> Search
+    Embed --> Qdrant[("Qdrant<br/>vectors")]
+    Qdrant --> Search
+    API -- "original file" --> Storage[("Supabase Storage")]
+    API -- "document list, history" --> DB[("Supabase PostgreSQL")]
+    Answer --> UI
 ```
 
 | Part | Technology |
