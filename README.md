@@ -72,6 +72,48 @@ docker compose up -d qdrant
 RAG_QDRANT_URL=http://127.0.0.1:6333 uv run rag eval --dataset scifact
 ```
 
+## Project Structure
+
+```
+├── src/rag/
+│   ├── ingestion/
+│   │   ├── loaders.py      # Parsers for PDF (pypdf), text and Markdown, from bytes
+│   │   ├── chunking.py     # Recursive splitter (1200 chars, sentence-level overlap)
+│   │   └── indexer.py      # Chunk, embed and write documents; idempotent re-indexing
+│   ├── retrieval/
+│   │   ├── embeddings.py   # Dense (bge-small-en-v1.5) and BM25 embedders on ONNX Runtime
+│   │   ├── store.py        # Qdrant collection: dense, sparse and hybrid search per owner
+│   │   ├── fusion.py       # Reciprocal rank fusion with a fixed tie-break
+│   │   ├── rerank.py       # Optional cross-encoder reranking
+│   │   └── retriever.py    # Query pipeline: embed, search, fuse, rerank
+│   ├── generation/
+│   │   └── answer.py       # Prompt, Gemini call, citation extraction
+│   ├── library/
+│   │   ├── auth.py         # Supabase Auth: who is calling
+│   │   ├── db.py           # documents and messages tables (SQLModel)
+│   │   ├── storage.py      # Original files: Supabase Storage or a local directory
+│   │   ├── service.py      # Add, list and delete a user's documents; question history
+│   │   └── migrations/     # Alembic migrations, run by `rag migrate`
+│   ├── evaluation/
+│   │   ├── beir.py         # Download and read BEIR datasets
+│   │   ├── metrics.py      # nDCG, recall, MRR, bootstrap confidence intervals
+│   │   └── runner.py       # Run configurations, paired comparisons, reports
+│   ├── api.py              # FastAPI entrypoint: /documents, /search, /ask, /messages
+│   ├── cli.py              # Command line: ingest, search, ask, serve, migrate, eval
+│   ├── config.py           # Centralized settings from environment variables
+│   ├── services.py         # Wires the components together from settings
+│   └── documents.py        # Document, Chunk and Hit data types
+├── ui/                     # Streamlit app: sign in, upload, chat with cited answers
+├── tests/                  # Offline test suite with fake embedders and in-memory stores
+├── results/                # Committed benchmark reports (SciFact, NFCorpus)
+├── examples/docs/          # Sample documents for a first ingest
+├── .github/workflows/      # CI: lint, tests on Python 3.11 and 3.13, image build
+├── Dockerfile              # Multi-stage image: dev, ui and runtime targets
+├── docker-compose.yml      # Qdrant + API + Streamlit
+├── pyproject.toml          # Dependencies and tool configuration
+└── uv.lock                 # Pinned dependency versions
+```
+
 ## Quickstart
 
 ```bash
@@ -148,20 +190,3 @@ uv run ruff check . && uv run ruff format --check .
 
 Tests use embedded Qdrant, SQLite in memory and fake embedders, so they need no server,
 no network and no model downloads.
-
-```
-src/rag/
-  config.py, services.py     settings and wiring
-  loaders.py, chunking.py    read files, split into chunks
-  embeddings.py, rerank.py   dense, BM25 and cross-encoder models
-  store.py, fusion.py        Qdrant search and rank fusion
-  pipeline.py                Indexer and Retriever
-  generate.py                prompt, Gemini call, citations
-  db.py, migrations/         documents and messages tables
-  auth.py, storage.py        Supabase sign-in and file storage
-  library.py                 add, list and delete a user's documents
-  api.py, cli.py             FastAPI app and command line
-  eval/                      BEIR loader, metrics, benchmark runner
-ui/app.py                    Streamlit app
-results/                     committed benchmark reports
-```
