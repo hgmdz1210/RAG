@@ -76,42 +76,17 @@ RAG_QDRANT_URL=http://127.0.0.1:6333 uv run rag eval --dataset scifact
 
 ```
 ├── src/rag/
-│   ├── ingestion/
-│   │   ├── loaders.py      # Parsers for PDF (pypdf), text and Markdown, from bytes
-│   │   ├── chunking.py     # Recursive splitter (1200 chars, sentence-level overlap)
-│   │   └── indexer.py      # Chunk, embed and write documents; idempotent re-indexing
-│   ├── retrieval/
-│   │   ├── embeddings.py   # Dense (bge-small-en-v1.5) and BM25 embedders on ONNX Runtime
-│   │   ├── store.py        # Qdrant collection: dense, sparse and hybrid search per owner
-│   │   ├── fusion.py       # Reciprocal rank fusion with a fixed tie-break
-│   │   ├── rerank.py       # Optional cross-encoder reranking
-│   │   └── retriever.py    # Query pipeline: embed, search, fuse, rerank
-│   ├── generation/
-│   │   └── answer.py       # Prompt, Gemini call, citation extraction
-│   ├── library/
-│   │   ├── auth.py         # Supabase Auth: who is calling
-│   │   ├── db.py           # documents and messages tables (SQLModel)
-│   │   ├── storage.py      # Original files: Supabase Storage or a local directory
-│   │   ├── service.py      # Add, list and delete a user's documents; question history
-│   │   └── migrations/     # Alembic migrations, run by `rag migrate`
-│   ├── evaluation/
-│   │   ├── beir.py         # Download and read BEIR datasets
-│   │   ├── metrics.py      # nDCG, recall, MRR, bootstrap confidence intervals
-│   │   └── runner.py       # Run configurations, paired comparisons, reports
-│   ├── api.py              # FastAPI entrypoint: /documents, /search, /ask, /messages
-│   ├── cli.py              # Command line: ingest, search, ask, serve, migrate, eval
-│   ├── config.py           # Centralized settings from environment variables
-│   ├── services.py         # Wires the components together from settings
-│   └── documents.py        # Document, Chunk and Hit data types
-├── ui/                     # Streamlit app: sign in, upload, chat with cited answers
-├── tests/                  # Offline test suite with fake embedders and in-memory stores
-├── results/                # Committed benchmark reports (SciFact, NFCorpus)
-├── examples/docs/          # Sample documents for a first ingest
-├── .github/workflows/      # CI: lint, tests on Python 3.11 and 3.13, image build
-├── Dockerfile              # Multi-stage image: dev, ui and runtime targets
-├── docker-compose.yml      # Qdrant + API + Streamlit
-├── pyproject.toml          # Dependencies and tool configuration
-└── uv.lock                 # Pinned dependency versions
+│   ├── ingestion/      # Parse PDF, text and Markdown; split into chunks; index
+│   ├── retrieval/      # Dense + BM25 embeddings, Qdrant search, rank fusion, reranking
+│   ├── generation/     # Prompt, Gemini call, citation extraction
+│   ├── library/        # Supabase sign-in, document registry, file storage, history
+│   ├── evaluation/     # BEIR datasets, metrics, benchmark runner
+│   ├── api.py          # FastAPI entrypoint
+│   └── cli.py          # Command line: ingest, search, ask, serve, migrate, eval
+├── ui/                 # Streamlit app: sign in, upload, chat with cited answers
+├── tests/              # Offline test suite
+├── results/            # Benchmark reports (SciFact, NFCorpus)
+└── docker-compose.yml  # Qdrant + API + Streamlit
 ```
 
 ## Quickstart
