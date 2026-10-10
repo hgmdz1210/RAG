@@ -14,16 +14,17 @@ from collections.abc import Sequence
 import pytest
 from qdrant_client import QdrantClient
 
-from rag.auth import User
 from rag.config import Settings
-from rag.db import create_tables, make_engine
 from rag.documents import Document, Hit
-from rag.embeddings import SparseVector
-from rag.generate import Answer
-from rag.library import Library
-from rag.pipeline import Indexer, Retriever
+from rag.generation.answer import Answer
+from rag.ingestion.indexer import Indexer
+from rag.library.auth import User
+from rag.library.db import create_tables, make_engine
+from rag.library.service import Library
+from rag.retrieval.embeddings import SparseVector
+from rag.retrieval.retriever import Retriever
+from rag.retrieval.store import QdrantStore
 from rag.services import Services
-from rag.store import QdrantStore
 
 
 def tokenize(text: str) -> list[str]:

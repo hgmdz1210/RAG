@@ -17,19 +17,19 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
-from rag.auth import User
-from rag.db import (
+from rag.documents import Document, Hit
+from rag.generation.answer import Answer
+from rag.ingestion.indexer import Indexer
+from rag.ingestion.loaders import SUPPORTED_SUFFIXES, parse_document
+from rag.library.auth import User
+from rag.library.db import (
     STATUS_FAILED,
     STATUS_READY,
     DocumentRecord,
     MessageRecord,
 )
-from rag.documents import Document, Hit
-from rag.generate import Answer
-from rag.loaders import SUPPORTED_SUFFIXES, parse_document
-from rag.pipeline import Indexer
-from rag.storage import FileStorage, StorageError
-from rag.store import QdrantStore
+from rag.library.storage import FileStorage, StorageError
+from rag.retrieval.store import QdrantStore
 
 logger = logging.getLogger(__name__)
 

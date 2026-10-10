@@ -95,6 +95,6 @@ def migrate(engine: Engine) -> None:
     from alembic.config import Config
 
     config = Config()
-    config.set_main_option("script_location", str(files("rag").joinpath("migrations")))
+    config.set_main_option("script_location", str(files("rag").joinpath("library/migrations")))
     config.attributes["engine"] = engine
     command.upgrade(config, "head")

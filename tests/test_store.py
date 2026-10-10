@@ -2,7 +2,7 @@ import pytest
 
 from conftest import CORPUS, FakeDense, FakeSparse
 from rag.documents import Document
-from rag.pipeline import Indexer
+from rag.ingestion.indexer import Indexer
 
 
 def _search(store, mode, query, **kwargs):

@@ -17,12 +17,12 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from rag import __version__
-from rag.auth import LOCAL_USER, AuthUnavailable, User
 from rag.config import SearchMode, get_settings
-from rag.db import DocumentRecord, MessageRecord
 from rag.documents import Hit
-from rag.generate import GenerationError
-from rag.library import DuplicateDocument, UploadRejected
+from rag.generation.answer import GenerationError
+from rag.library.auth import LOCAL_USER, AuthUnavailable, User
+from rag.library.db import DocumentRecord, MessageRecord
+from rag.library.service import DuplicateDocument, UploadRejected
 from rag.services import Services, build_services
 
 logger = logging.getLogger(__name__)

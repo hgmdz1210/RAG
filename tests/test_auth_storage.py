@@ -1,9 +1,9 @@
 import httpx
 import pytest
 
-from rag.auth import AuthUnavailable, SupabaseAuthenticator, User
-from rag.db import make_engine
-from rag.storage import LocalStorage, StorageError, SupabaseStorage
+from rag.library.auth import AuthUnavailable, SupabaseAuthenticator, User
+from rag.library.db import make_engine
+from rag.library.storage import LocalStorage, StorageError, SupabaseStorage
 
 
 def _client(handler) -> httpx.Client:
@@ -129,7 +129,7 @@ def test_migrations_build_the_same_schema_as_the_models(tmp_path):
     from sqlalchemy import inspect
     from sqlmodel import SQLModel
 
-    from rag import db
+    from rag.library import db
 
     migrated = make_engine(f"sqlite:///{tmp_path / 'migrated.db'}")
     db.migrate(migrated)

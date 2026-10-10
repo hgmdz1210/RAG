@@ -1,9 +1,9 @@
-"""Alembic environment. The engine is supplied by ``rag.db.migrate``."""
+"""Alembic environment. The engine is supplied by ``rag.library.db.migrate``."""
 
 from alembic import context
 from sqlmodel import SQLModel
 
-from rag import db  # noqa: F401  (registers the tables on the metadata)
+from rag.library import db  # noqa: F401  (registers the tables on the metadata)
 
 engine = context.config.attributes["engine"]
 

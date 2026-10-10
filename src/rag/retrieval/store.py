@@ -7,8 +7,8 @@ from qdrant_client import QdrantClient, models
 
 from rag.config import SearchMode
 from rag.documents import Chunk, Hit
-from rag.embeddings import SparseVector
-from rag.fusion import RRF_K, reciprocal_rank_fusion
+from rag.retrieval.embeddings import SparseVector
+from rag.retrieval.fusion import RRF_K, reciprocal_rank_fusion
 
 DENSE_VECTOR = "dense"
 SPARSE_VECTOR = "sparse"
@@ -139,7 +139,7 @@ class QdrantStore:
         In hybrid mode both searches go to Qdrant in one batch request, each returning
         its top ``candidate_k`` chunks, and the two rankings are merged here with
         reciprocal rank fusion. Fusing on this side keeps the order of tied chunks
-        fixed; see :func:`rag.fusion.reciprocal_rank_fusion`.
+        fixed; see :func:`rag.retrieval.fusion.reciprocal_rank_fusion`.
 
         With ``owner`` only that user's chunks are searched. The filter is applied
         inside Qdrant, so another user's text never leaves the store.

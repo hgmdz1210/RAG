@@ -6,7 +6,7 @@ import pytest
 from google.genai import errors, types
 
 from rag.documents import Chunk, Hit
-from rag.generate import (
+from rag.generation.answer import (
     NO_SOURCES_ANSWER,
     REFUSAL_ANSWER,
     SYSTEM_PROMPT,

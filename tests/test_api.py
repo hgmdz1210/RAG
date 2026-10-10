@@ -4,7 +4,7 @@ from pydantic import SecretStr
 
 from conftest import CORPUS
 from rag.api import create_app
-from rag.generate import GenerationError
+from rag.generation.answer import GenerationError
 
 
 @pytest.fixture

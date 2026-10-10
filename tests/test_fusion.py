@@ -3,7 +3,7 @@ import random
 import pytest
 
 from rag.documents import Chunk, Hit
-from rag.fusion import RRF_K, reciprocal_rank_fusion
+from rag.retrieval.fusion import RRF_K, reciprocal_rank_fusion
 
 
 def ranking(*chunk_ids: str) -> list[Hit]:

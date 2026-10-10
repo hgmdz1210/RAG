@@ -9,10 +9,10 @@ from pathlib import Path
 
 from rag.config import get_settings
 from rag.documents import Hit
-from rag.eval import beir, runner
-from rag.generate import GenerationError
-from rag.loaders import load_path
-from rag.pipeline import IndexStats
+from rag.evaluation import beir, runner
+from rag.generation.answer import GenerationError
+from rag.ingestion.indexer import IndexStats
+from rag.ingestion.loaders import load_path
 from rag.services import Services, build_services
 
 _PREVIEW_CHARS = 200
@@ -152,7 +152,7 @@ def _serve(args: argparse.Namespace) -> int:
 
 
 def _migrate(args: argparse.Namespace) -> int:
-    from rag import db
+    from rag.library import db
 
     engine = db.make_engine(get_settings().database_url)
     db.migrate(engine)

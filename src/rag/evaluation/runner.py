@@ -11,9 +11,9 @@ from typing import Any
 
 from rag.config import SearchMode, Settings
 from rag.documents import Hit
-from rag.eval import metrics
-from rag.eval.beir import BeirDataset
-from rag.pipeline import Retriever
+from rag.evaluation import metrics
+from rag.evaluation.beir import BeirDataset
+from rag.retrieval.retriever import Retriever
 
 _BOOTSTRAP_RESAMPLES = 2000
 _BOOTSTRAP_SEED = 0

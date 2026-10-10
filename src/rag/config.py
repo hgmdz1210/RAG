@@ -6,7 +6,7 @@ from typing import Literal, Self
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from rag.fusion import RRF_K
+from rag.retrieval.fusion import RRF_K
 
 SearchMode = Literal["dense", "sparse", "hybrid"]
 

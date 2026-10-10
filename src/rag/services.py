@@ -3,16 +3,17 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from rag.auth import Authenticator, SupabaseAuthenticator
 from rag.config import Settings
-from rag.db import create_tables, make_engine
-from rag.embeddings import FastEmbedDense, FastEmbedSparse
-from rag.generate import GeminiGenerator, Generator
-from rag.library import Library
-from rag.pipeline import Indexer, Retriever
-from rag.rerank import FastEmbedReranker
-from rag.storage import FileStorage, LocalStorage, SupabaseStorage
-from rag.store import QdrantStore, make_client
+from rag.generation.answer import GeminiGenerator, Generator
+from rag.ingestion.indexer import Indexer
+from rag.library.auth import Authenticator, SupabaseAuthenticator
+from rag.library.db import create_tables, make_engine
+from rag.library.service import Library
+from rag.library.storage import FileStorage, LocalStorage, SupabaseStorage
+from rag.retrieval.embeddings import FastEmbedDense, FastEmbedSparse
+from rag.retrieval.rerank import FastEmbedReranker
+from rag.retrieval.retriever import Retriever
+from rag.retrieval.store import QdrantStore, make_client
 
 
 @dataclass(slots=True)

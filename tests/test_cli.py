@@ -1,7 +1,7 @@
 import pytest
 
 from rag import cli
-from rag.generate import GenerationError
+from rag.generation.answer import GenerationError
 
 
 @pytest.fixture

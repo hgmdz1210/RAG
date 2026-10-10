@@ -1,6 +1,6 @@
 import pytest
 
-from rag.loaders import load_path
+from rag.ingestion.loaders import load_path
 
 
 def _minimal_pdf(text: str) -> bytes:
@@ -79,7 +79,7 @@ def test_missing_path_raises(tmp_path):
 
 
 def test_parse_document_reads_bytes_by_file_type():
-    from rag.loaders import parse_document
+    from rag.ingestion.loaders import parse_document
 
     assert parse_document("notes.txt", b"  Plain notes.  ") == ("Plain notes.", "")
     assert parse_document("guide.MD", b"# Guide\n\nBody.") == ("# Guide\n\nBody.", "Guide")
@@ -88,7 +88,7 @@ def test_parse_document_reads_bytes_by_file_type():
 
 
 def test_parse_document_rejects_unsupported_types():
-    from rag.loaders import parse_document
+    from rag.ingestion.loaders import parse_document
 
     with pytest.raises(ValueError, match="unsupported"):
         parse_document("malware.exe", b"MZ")

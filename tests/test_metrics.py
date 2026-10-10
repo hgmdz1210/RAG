@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from rag.eval.metrics import (
+from rag.evaluation.metrics import (
     bootstrap_ci,
     hit_at_k,
     mean,

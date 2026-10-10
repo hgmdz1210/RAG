@@ -1,10 +1,10 @@
 import pytest
 
-from rag.auth import User
-from rag.db import STATUS_FAILED, STATUS_READY
-from rag.generate import Answer
-from rag.library import DuplicateDocument, UploadRejected
-from rag.storage import StorageError
+from rag.generation.answer import Answer
+from rag.library.auth import User
+from rag.library.db import STATUS_FAILED, STATUS_READY
+from rag.library.service import DuplicateDocument, UploadRejected
+from rag.library.storage import StorageError
 
 ALICE = User(id="alice")
 BOB = User(id="bob")

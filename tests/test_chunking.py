@@ -1,7 +1,7 @@
 import pytest
 
-from rag.chunking import _SEPARATORS, _atomize, chunk_document, split_text
 from rag.documents import Document
+from rag.ingestion.chunking import _SEPARATORS, _atomize, chunk_document, split_text
 
 PARAGRAPH = (
     "Hybrid search combines two signals. Dense vectors capture meaning. "
